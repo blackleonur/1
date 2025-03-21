@@ -21,6 +21,7 @@ import {
   faImage,
   faSmile,
 } from "@fortawesome/free-solid-svg-icons";
+import apiurl from "../Apiurl";
 
 type MessagesScreenNavigationProp = StackNavigationProp<
   RootStackParamList,

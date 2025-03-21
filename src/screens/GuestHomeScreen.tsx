@@ -30,6 +30,7 @@ import {
   faEnvelope,
   faThLarge, // faViewGrid yerine faThLarge kullanıyoruz
 } from "@fortawesome/free-solid-svg-icons";
+import apiurl from "../Apiurl";
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
 
@@ -390,7 +391,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                 style={styles.authModalRegisterButton}
                 onPress={() => {
                   setShowAuthModal(false);
-                  navigation.navigate("Register");
+                  navigation.navigate("RegisterScreen");
                 }}
               >
                 <Text style={styles.authModalRegisterButtonText}>
@@ -413,7 +414,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
         <TouchableOpacity style={styles.addButton} onPress={handleGuestAction}>
           <IconView name="plus" size={28} color="white" />
-          <Text style={styles.addButtonText}>İlan Ver</Text>
+          <Text style={styles.addButtonText}>İlan1 123Ver</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

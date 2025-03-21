@@ -3,8 +3,15 @@ export type RootStackParamList = {
   Advert: { advertId: string };
   SplashScreen: undefined;
   GuestHomeScreen: undefined;
-  Register: undefined;
-  Verification: undefined;
+  RegisterScreen: undefined;
+  VerificationScreen: {
+    userData: {
+      fullName: string;
+      email: string;
+      phoneNumber: string;
+      password: string;
+    };
+  };
   Profile: undefined;
   MessagesArea: undefined;
   Messages: { userId: string; userName: string };

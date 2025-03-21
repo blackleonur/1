@@ -16,6 +16,7 @@ import {
   faSearch,
   faEllipsisV,
 } from "@fortawesome/free-solid-svg-icons";
+import apiurl from "../Apiurl";
 
 type MessagesAreaScreenNavigationProp = StackNavigationProp<
   RootStackParamList,

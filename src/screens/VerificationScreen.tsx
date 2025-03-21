@@ -16,10 +16,18 @@ import {
 } from "react-native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../Types";
+import apiurl from "../Apiurl";
+import { useRoute } from "@react-navigation/native";
+import type { RouteProp } from "@react-navigation/native";
 
 type VerificationScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
-  "Verification"
+  "VerificationScreen"
+>;
+
+type VerificationScreenRouteProp = RouteProp<
+  RootStackParamList,
+  "VerificationScreen"
 >;
 
 type Props = {
@@ -27,6 +35,8 @@ type Props = {
 };
 
 const VerificationScreen: React.FC<Props> = ({ navigation }) => {
+  const route = useRoute<VerificationScreenRouteProp>();
+  const { userData } = route.params;
   const [code, setCode] = useState<string[]>(["", "", "", "", "", ""]);
   const inputRefs = useRef<Array<TextInput | null>>([]);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
@@ -51,39 +61,85 @@ const VerificationScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  // Doğrulama kodunu kontrol et
-  const verifyCode = () => {
+  // Doğrulama kodunu kontrol et ve kayıt işlemini gerçekleştir
+  const verifyCode = async () => {
     const enteredCode = code.join("");
 
-    // Şimdilik herhangi bir 6 haneli kodu kabul et
-    if (enteredCode.length === 6) {
-      // Hoş geldiniz modalını göster
-      setShowWelcomeModal(true);
-
-      // İlerleme çubuğu animasyonunu başlat
-      Animated.timing(progressAnimation, {
-        toValue: 1,
-        duration: 3000,
-        easing: Easing.linear,
-        useNativeDriver: false,
-      }).start();
-
-      // 3 saniye sonra ana sayfaya yönlendir
-      setTimeout(() => {
-        setShowWelcomeModal(false);
-        navigation.reset({
-          index: 0,
-          routes: [{ name: "Home" }],
-        });
-      }, 3000);
-    } else {
+    if (enteredCode.length !== 6) {
       Alert.alert("Hata", "Lütfen 6 haneli doğrulama kodunu giriniz.");
+      return;
+    }
+
+    try {
+      // Backend'e kayıt isteği gönder
+      const response = await fetch(`${apiurl}/api/auth/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fullName: userData.fullName,
+          email: userData.email,
+          phoneNumber: userData.phoneNumber,
+          password: userData.password,
+          verificationCode: enteredCode,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.message === "User registered successfully") {
+        // Hoş geldiniz modalını göster
+        setShowWelcomeModal(true);
+
+        // İlerleme çubuğu animasyonunu başlat
+        Animated.timing(progressAnimation, {
+          toValue: 1,
+          duration: 3000,
+          easing: Easing.linear,
+          useNativeDriver: false,
+        }).start();
+
+        // 3 saniye sonra ana sayfaya yönlendir
+        setTimeout(() => {
+          setShowWelcomeModal(false);
+          navigation.reset({
+            index: 0,
+            routes: [{ name: "Home" }],
+          });
+        }, 3000);
+      } else {
+        Alert.alert("Hata", data.message || "Doğrulama kodu hatalı.");
+      }
+    } catch (error) {
+      Alert.alert("Hata", "Bir hata oluştu. Lütfen tekrar deneyin.");
     }
   };
 
   // Yeni kod gönder
-  const resendCode = () => {
-    Alert.alert("Bilgi", "Yeni doğrulama kodu gönderildi.");
+  const resendCode = async () => {
+    try {
+      const response = await fetch(`${apiurl}/api/auth/resend-code`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: userData.email,
+          phoneNumber: userData.phoneNumber,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        Alert.alert("Başarılı", "Yeni doğrulama kodu gönderildi.");
+      } else {
+        Alert.alert("Hata", data.message || "Kod gönderilemedi.");
+      }
+    } catch (error) {
+      Alert.alert("Hata", "Bir hata oluştu. Lütfen tekrar deneyin.");
+    }
   };
 
   const progressWidth = progressAnimation.interpolate({

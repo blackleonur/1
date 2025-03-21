@@ -3,6 +3,7 @@ import { View, Text, Image, StyleSheet, Animated } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../Types";
+import apiurl from "../Apiurl";
 
 type SplashScreenNavigationProp = StackNavigationProp<
   RootStackParamList,

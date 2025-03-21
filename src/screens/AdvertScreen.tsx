@@ -10,6 +10,7 @@ import {
 import { RouteProp } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList, Advert } from "../Types";
+import apiurl from "../Apiurl";
 
 type AdvertScreenRouteProp = RouteProp<RootStackParamList, "Advert">;
 type AdvertScreenNavigationProp = StackNavigationProp<
@@ -39,6 +40,9 @@ const AdvertScreen: React.FC<Props> = ({ route, navigation }) => {
       image: "https://picsum.photos/400/300",
       location: "İstanbul, Kadıköy",
       date: "15 Mayıs 2023",
+      sellerName: "Ahmet Yılmaz",
+      distance: "2.5 km",
+      category: "Elektronik",
     };
 
     setTimeout(() => {

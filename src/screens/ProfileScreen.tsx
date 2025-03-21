@@ -25,6 +25,7 @@ import {
   faCreditCard,
   faMapMarkerAlt,
 } from "@fortawesome/free-solid-svg-icons";
+import apiurl from "../Apiurl";
 
 type ProfileScreenNavigationProp = StackNavigationProp<
   RootStackParamList,

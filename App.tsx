@@ -35,8 +35,11 @@ export default function App() {
           options={{ title: "İlan Detayları" }}
         />
         <Stack.Screen name="GuestHomeScreen" component={GuestHomeScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
-        <Stack.Screen name="Verification" component={VerificationScreen} />
+        <Stack.Screen name="RegisterScreen" component={RegisterScreen} />
+        <Stack.Screen
+          name="VerificationScreen"
+          component={VerificationScreen}
+        />
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="MessagesArea" component={MessagesAreaScreen} />
         <Stack.Screen name="Messages" component={MessagesScreen} />
