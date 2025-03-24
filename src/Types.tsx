@@ -15,7 +15,15 @@ export type RootStackParamList = {
   Profile: undefined;
   MessagesArea: undefined;
   Messages: { userId: string; userName: string };
-  AddAdvert: undefined;
+  AddAdvert: { adId?: number };
+  PersonalInfo: {
+    email: string;
+    phoneNumber: string;
+  };
+  Favs: undefined;
+  MyAds: undefined;
+  Privacy: undefined;
+  Help: undefined;
 };
 
 export type Advert = {

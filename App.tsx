@@ -13,6 +13,11 @@ import ProfileScreen from "./src/screens/ProfileScreen";
 import MessagesAreaScreen from "./src/screens/MessagesAreaScreen";
 import MessagesScreen from "./src/screens/MessagesScreen";
 import AddAdvertScreen from "./src/screens/AddAdvertScreen";
+import PersonalInfoScreen from "./src/screens/PersonalInfoScreen";
+import FavsScreen from "./src/screens/FavsScreen";
+import MyAdsScreen from "./src/screens/MyAdsScreen";
+import PrivacyScreen from "./src/screens/PrivacyScreen";
+import HelpScreen from "./src/screens/HelpScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -44,6 +49,80 @@ export default function App() {
         <Stack.Screen name="MessagesArea" component={MessagesAreaScreen} />
         <Stack.Screen name="Messages" component={MessagesScreen} />
         <Stack.Screen name="AddAdvert" component={AddAdvertScreen} />
+        <Stack.Screen
+          name="PersonalInfo"
+          component={PersonalInfoScreen}
+          options={{
+            title: "Kişisel Bilgilerim",
+            headerStyle: {
+              backgroundColor: "#8adbd2",
+            },
+            headerTintColor: "#fff",
+            headerTitleStyle: {
+              fontWeight: "bold",
+            },
+          }}
+        />
+        <Stack.Screen
+          name="Favs"
+          component={FavsScreen}
+          options={{
+            title: "Favorilerim",
+            headerShown: true,
+            headerStyle: {
+              backgroundColor: "#8adbd2",
+            },
+            headerTintColor: "#fff",
+            headerTitleStyle: {
+              fontWeight: "bold",
+            },
+          }}
+        />
+        <Stack.Screen
+          name="MyAds"
+          component={MyAdsScreen}
+          options={{
+            title: "İlanlarım",
+            headerShown: true,
+            headerStyle: {
+              backgroundColor: "#8adbd2",
+            },
+            headerTintColor: "#fff",
+            headerTitleStyle: {
+              fontWeight: "bold",
+            },
+          }}
+        />
+        <Stack.Screen
+          name="Privacy"
+          component={PrivacyScreen}
+          options={{
+            title: "Gizlilik ve Güvenlik",
+            headerShown: true,
+            headerStyle: {
+              backgroundColor: "#8adbd2",
+            },
+            headerTintColor: "#fff",
+            headerTitleStyle: {
+              fontWeight: "bold",
+            },
+          }}
+        />
+        <Stack.Screen
+          name="Help"
+          component={HelpScreen}
+          options={{
+            title: "Yardım ve Destek",
+            headerShown: true,
+            headerStyle: {
+              backgroundColor: "#8adbd2",
+            },
+            headerTintColor: "#fff",
+            headerTitleStyle: {
+              fontWeight: "bold",
+            },
+          }}
+        />
       </Stack.Navigator>
       <StatusBar style="auto" />
     </NavigationContainer>

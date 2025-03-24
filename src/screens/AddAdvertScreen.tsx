@@ -50,7 +50,7 @@ type Category = {
   icon?: string;
 };
 
-const AddAdvertScreen: React.FC<Props> = ({ navigation }) => {
+const AddAdvertScreen: React.FC<Props> = ({ navigation }): JSX.Element => {
   // State'ler
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -434,13 +434,12 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }) => {
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.5,
-        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets[0]) {
         const asset = result.assets[0];
-        if (asset.base64) {
-          setPhotos([...photos, `data:image/jpeg;base64,${asset.base64}`]);
+        if (asset.uri) {
+          setPhotos([...photos, asset.uri]); // URI'yi kaydet
         }
       }
     } catch (error) {
@@ -766,26 +765,23 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }) => {
     }
 
     try {
-      // Token kontrolü
-      const isValid = await TokenService.isTokenValid();
-      if (!isValid) {
+      // Token kontrolü ve kullanıcı bilgilerini alma
+      const [isValid, token, userData] = await Promise.all([
+        TokenService.isTokenValid(),
+        TokenService.getToken(),
+        TokenService.getUserData(),
+      ]);
+
+      if (!isValid || !token) {
         Alert.alert(
-          "Hata",
-          "Oturum süreniz dolmuş. Lütfen tekrar giriş yapın."
+          "Uyarı",
+          "Oturumunuz sonlanmış. Lütfen tekrar giriş yapın."
         );
-        navigation.navigate("RegisterScreen");
         return;
       }
 
-      const token = await TokenService.getToken();
-      if (!token) {
-        Alert.alert(
-          "Hata",
-          "Oturum süreniz dolmuş. Lütfen tekrar giriş yapın."
-        );
-        navigation.navigate("RegisterScreen");
-        return;
-      }
+      console.log("Token Durumu:", isValid);
+      console.log("Kullanıcı Bilgileri:", userData);
 
       // Son seçili kategori ID'sini al
       const lastSelectedCategoryId =
@@ -796,7 +792,7 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }) => {
         title: title.trim(),
         description: description.trim(),
         price: parseInt(price),
-        imageUrl: "", // Boş string olarak gönderiyoruz
+        imageUrl: "",
         categoryId: lastSelectedCategoryId,
         status: "Beklemede",
         address: address.trim(),
@@ -805,13 +801,7 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }) => {
       };
 
       // Gönderilecek veriyi console'da göster
-      console.log("API'ye gönderilecek veri:", {
-        ...advertData,
-        imageUrl:
-          "base64 formatında fotoğraf (uzunluk: " +
-          advertData.imageUrl.length +
-          " karakter)",
-      });
+      console.log("API'ye gönderilecek veri:", advertData);
 
       // API isteği
       const response = await fetch(`${apiurl}/api/ad-listings`, {
@@ -836,7 +826,11 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }) => {
         }
 
         console.log("API Hata Detayı:", errorData);
-        throw new Error(`HTTP error! status: ${response.status}`);
+        Alert.alert(
+          "Hata",
+          "İlan eklenirken bir hata oluştu. Lütfen tekrar deneyin."
+        );
+        return;
       }
 
       const result = await response.json();
@@ -846,25 +840,62 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }) => {
       if (photos.length > 0) {
         try {
           const formData = new FormData();
-          formData.append("file", photos[0]);
+
+          // URI'den dosya oluştur
+          const fileUri = photos[0];
+          const fileName = fileUri.split("/").pop();
+          const match = /\.(\w+)$/.exec(fileName || "");
+          const type = match ? `image/${match[1]}` : "image";
+
+          formData.append("file", {
+            uri: fileUri,
+            name: fileName,
+            type,
+          } as any);
+
+          console.log("Gönderilecek dosya bilgileri:", {
+            uri: fileUri,
+            name: fileName,
+            type,
+          });
 
           // Görseli yükle
           const imageResponse = await fetch(`${apiurl}/api/images/upload`, {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${token}`,
               "Content-Type": "multipart/form-data",
+              Authorization: `Bearer ${token}`,
             },
             body: formData,
           });
 
+          const responseText = await imageResponse.text();
+          console.log("Görsel yükleme yanıtı (ham):", responseText);
+
           if (!imageResponse.ok) {
-            console.error("Görsel yüklenirken hata oluştu");
+            console.error(
+              "Görsel yükleme hatası - Status:",
+              imageResponse.status
+            );
+            console.error("Görsel yükleme hatası - Yanıt:", responseText);
+            Alert.alert(
+              "Uyarı",
+              "Görsel yüklenirken bir hata oluştu. Lütfen tekrar deneyin."
+            );
           } else {
-            console.log("Görsel başarıyla yüklendi");
+            try {
+              const imageResult = JSON.parse(responseText);
+              console.log("Görsel başarıyla yüklendi:", imageResult);
+            } catch (parseError) {
+              console.error("Görsel yanıtı parse edilemedi:", parseError);
+            }
           }
         } catch (error) {
-          console.error("Görsel yükleme hatası:", error);
+          console.error("Görsel yükleme işlemi hatası:", error);
+          Alert.alert(
+            "Uyarı",
+            "Görsel yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin."
+          );
         }
       }
 

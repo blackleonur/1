@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Image,
   SafeAreaView,
   Switch,
+  Alert,
 } from "react-native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../Types";
@@ -22,10 +23,9 @@ import {
   faChevronRight,
   faBell,
   faShieldAlt,
-  faCreditCard,
-  faMapMarkerAlt,
 } from "@fortawesome/free-solid-svg-icons";
 import apiurl from "../Apiurl";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type ProfileScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -36,32 +36,117 @@ type Props = {
   navigation: ProfileScreenNavigationProp;
 };
 
+type Ad = {
+  id: number;
+  title: string;
+  price: number;
+  imageUrl: string;
+  status: string;
+  categoryName: string;
+};
+
+type User = {
+  id: string;
+  fullName: string;
+  email: string;
+  phoneNumber: string;
+};
+
+type UserData = {
+  user: User;
+  myAds: {
+    $values: Ad[];
+  };
+  favorites?: {
+    $values: Ad[];
+  };
+};
+
 const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [favorites, setFavorites] = useState<Ad[]>([]);
 
-  const handleLogout = () => {
-    // Çıkış işlemleri burada yapılacak
+  useEffect(() => {
+    fetchUserData();
+  }, []);
+
+  const fetchUserData = async () => {
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      console.log("Token:", token); // Token'ı kontrol et
+
+      if (!token) {
+        console.log("Token bulunamadı");
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "GuestHomeScreen" }],
+        });
+        return;
+      }
+
+      console.log("API isteği yapılıyor:", `${apiurl}/api/users/me`);
+      const response = await fetch(`${apiurl}/api/users/me`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      console.log("API Yanıt Status:", response.status);
+      const responseText = await response.text();
+      console.log("API Yanıt Body:", responseText);
+
+      if (!response.ok) {
+        throw new Error(
+          `Kullanıcı bilgileri alınamadı. Status: ${response.status}, Body: ${responseText}`
+        );
+      }
+
+      const data = JSON.parse(responseText);
+      console.log("Parsed Data:", data);
+      setUserData(data);
+    } catch (error: any) {
+      console.error("Hata detayı:", error);
+      Alert.alert(
+        "Hata",
+        `Kullanıcı bilgileri yüklenirken bir hata oluştu: ${error.message}`
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await AsyncStorage.removeItem("userToken");
     navigation.reset({
       index: 0,
       routes: [{ name: "GuestHomeScreen" }],
     });
   };
 
+  const handleFavorites = () => {
+    navigation.navigate("Favs");
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Yükleniyor...</Text>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profil Başlığı */}
         <View style={styles.header}>
-          <View style={styles.profileImageContainer}>
-            <Image
-              source={{
-                uri: "https://randomuser.me/api/portraits/men/32.jpg",
-              }}
-              style={styles.profileImage}
-            />
-          </View>
-          <Text style={styles.userName}>Ahmet Yılmaz</Text>
-          <Text style={styles.userEmail}>ahmet.yilmaz@example.com</Text>
+          <Text style={styles.userName}>
+            {userData?.user.fullName || "İsimsiz Kullanıcı"}
+          </Text>
           <TouchableOpacity style={styles.editProfileButton}>
             <Text style={styles.editProfileButtonText}>Profili Düzenle</Text>
           </TouchableOpacity>
@@ -70,17 +155,22 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         {/* İstatistikler */}
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>12</Text>
+            <Text style={styles.statNumber}>
+              {userData?.myAds.$values.length || "0"}
+            </Text>
             <Text style={styles.statLabel}>İlanlarım</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>24</Text>
+            <Text style={styles.statNumber}>0</Text>
             <Text style={styles.statLabel}>Favoriler</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>8</Text>
+            <Text style={styles.statNumber}>
+              {userData?.myAds.$values.filter((ad) => ad.status === "Satıldı")
+                .length || "0"}
+            </Text>
             <Text style={styles.statLabel}>Satışlar</Text>
           </View>
         </View>
@@ -89,46 +179,18 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.menuSection}>
           <Text style={styles.menuSectionTitle}>Hesabım</Text>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              navigation.navigate("PersonalInfo", {
+                email: userData?.user.email || "",
+                phoneNumber: userData?.user.phoneNumber || "",
+              });
+            }}
+          >
             <View style={styles.menuItemLeft}>
               <FontAwesomeIcon icon={faUser} size={20} color="#8adbd2" />
               <Text style={styles.menuItemText}>Kişisel Bilgilerim</Text>
-            </View>
-            <FontAwesomeIcon icon={faChevronRight} size={16} color="#ccc" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <FontAwesomeIcon icon={faHeart} size={20} color="#8adbd2" />
-              <Text style={styles.menuItemText}>Favorilerim</Text>
-            </View>
-            <FontAwesomeIcon icon={faChevronRight} size={16} color="#ccc" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <FontAwesomeIcon icon={faShoppingBag} size={20} color="#8adbd2" />
-              <Text style={styles.menuItemText}>İlanlarım</Text>
-            </View>
-            <FontAwesomeIcon icon={faChevronRight} size={16} color="#ccc" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <FontAwesomeIcon
-                icon={faMapMarkerAlt}
-                size={20}
-                color="#8adbd2"
-              />
-              <Text style={styles.menuItemText}>Adreslerim</Text>
-            </View>
-            <FontAwesomeIcon icon={faChevronRight} size={16} color="#ccc" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <FontAwesomeIcon icon={faCreditCard} size={20} color="#8adbd2" />
-              <Text style={styles.menuItemText}>Ödeme Yöntemlerim</Text>
             </View>
             <FontAwesomeIcon icon={faChevronRight} size={16} color="#ccc" />
           </TouchableOpacity>
@@ -152,21 +214,27 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
 
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuItemLeft}>
-              <FontAwesomeIcon icon={faShieldAlt} size={20} color="#8adbd2" />
-              <Text style={styles.menuItemText}>Gizlilik ve Güvenlik</Text>
-            </View>
-            <FontAwesomeIcon icon={faChevronRight} size={16} color="#ccc" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
               <FontAwesomeIcon icon={faCog} size={20} color="#8adbd2" />
               <Text style={styles.menuItemText}>Uygulama Ayarları</Text>
             </View>
             <FontAwesomeIcon icon={faChevronRight} size={16} color="#ccc" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate("Privacy")}
+          >
+            <View style={styles.menuItemLeft}>
+              <FontAwesomeIcon icon={faShieldAlt} size={20} color="#8adbd2" />
+              <Text style={styles.menuItemText}>Gizlilik ve Güvenlik</Text>
+            </View>
+            <FontAwesomeIcon icon={faChevronRight} size={16} color="#ccc" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate("Help")}
+          >
             <View style={styles.menuItemLeft}>
               <FontAwesomeIcon
                 icon={faQuestionCircle}
@@ -200,28 +268,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
-  profileImageContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    overflow: "hidden",
-    marginBottom: 15,
-    borderWidth: 3,
-    borderColor: "#8adbd2",
-  },
-  profileImage: {
-    width: "100%",
-    height: "100%",
-  },
   userName: {
     fontSize: 22,
     fontWeight: "bold",
     color: "#333",
-    marginBottom: 5,
-  },
-  userEmail: {
-    fontSize: 16,
-    color: "#666",
     marginBottom: 15,
   },
   editProfileButton: {
@@ -326,6 +376,12 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#ff6b6b",
     marginLeft: 10,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f8f8f8",
   },
 });
 

@@ -14,6 +14,7 @@ import {
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList, Advert } from "../Types";
 import apiurl from "../Apiurl";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // FontAwesome ikonları için importlar
 import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
@@ -39,6 +40,8 @@ import {
   faMap,
   faBuilding,
   faArrowLeft,
+  faShoppingBag,
+  faHeart,
 } from "@fortawesome/free-solid-svg-icons";
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
@@ -80,14 +83,74 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   // İlanları getiren fonksiyon
   const fetchAdverts = async () => {
     try {
-      const response = await fetch(`${apiurl}/api/adverts`);
+      // Local storage'dan token'ı al
+      const token = await AsyncStorage.getItem("userToken");
+
+      if (!token) {
+        console.error("Token bulunamadı");
+        return;
+      }
+
+      const response = await fetch(`${apiurl}/api/ad-listings/user-ads`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      setAllAdverts(data);
+
+      // API'den gelen veriyi kontrol et ve düzenle
+      if (data && Array.isArray(data.$values)) {
+        setAllAdverts(data.$values);
+      } else {
+        console.error("API'den geçersiz veri formatı:", data);
+        setAllAdverts([]);
+      }
     } catch (error) {
       console.error("İlanlar yüklenirken hata oluştu:", error);
+      setAllAdverts([]);
+    }
+  };
+
+  // Kategoriye göre ilanları getiren fonksiyon
+  const fetchAdvertsByCategory = async (categoryId: number) => {
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+
+      if (!token) {
+        console.error("Token bulunamadı");
+        return;
+      }
+
+      const response = await fetch(
+        `${apiurl}/api/ad-listings/category/${categoryId}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+
+      if (data && Array.isArray(data.$values)) {
+        setAllAdverts(data.$values);
+      } else {
+        console.error("API'den geçersiz veri formatı:", data);
+        setAllAdverts([]);
+      }
+    } catch (error) {
+      console.error("Kategori ilanları yüklenirken hata oluştu:", error);
       setAllAdverts([]);
     }
   };
@@ -318,7 +381,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   // handleCategorySelect fonksiyonunu güncelle
-  const handleCategorySelect = (categoryId: number) => {
+  const handleCategorySelect = async (categoryId: number) => {
     const category =
       selectedMainCategory === 1
         ? vehicleCategories.find((cat) => cat.id === categoryId)
@@ -329,14 +392,21 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       const hasChildren = vehicleCategories.some(
         (cat) => cat.parentId === categoryId
       );
-      setSelectedCategory(categoryId); // Her durumda kategoriyi seç
+      setSelectedCategory(categoryId);
+      if (!hasChildren) {
+        // Alt kategori seçildiyse ilanları getir
+        await fetchAdvertsByCategory(categoryId);
+      }
     } else {
       // Diğer ana kategoriler
       if (category?.parentId) {
         setSelectedCategory(categoryId);
+        await fetchAdvertsByCategory(categoryId);
       } else {
         setSelectedMainCategory(categoryId);
         setSelectedCategory("all");
+        // Ana kategori seçildiğinde tüm ilanları getir
+        await fetchAdverts();
       }
     }
   };
@@ -614,29 +684,45 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       </Modal>
 
-      <View style={styles.footer}>
+      {/* Alt Navigasyon Bar */}
+      <View style={styles.bottomNav}>
         <TouchableOpacity
-          style={styles.footerButton}
+          style={styles.bottomNavItem}
           onPress={() => navigation.navigate("Profile")}
         >
-          <IconView name="account" size={24} color="#8adbd2" />
-          <Text style={styles.footerButtonText}>Profil</Text>
+          <FontAwesomeIcon icon={faUser} size={24} color="#8adbd2" />
+          <Text style={styles.bottomNavText}>Profil</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.bottomNavItem}
+          onPress={() => navigation.navigate("MyAds")}
+        >
+          <FontAwesomeIcon icon={faShoppingBag} size={24} color="#8adbd2" />
+          <Text style={styles.bottomNavText}>İlanlarım</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => navigation.navigate("AddAdvert")}
+          onPress={() => navigation.navigate("AddAdvert", { adId: undefined })}
         >
-          <IconView name="plus" size={28} color="white" />
-          <Text style={styles.addButtonText}>İlan Ver</Text>
+          <FontAwesomeIcon icon={faPlus} size={24} color="#fff" />
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.footerButton}
+          style={styles.bottomNavItem}
+          onPress={() => navigation.navigate("Favs")}
+        >
+          <FontAwesomeIcon icon={faHeart} size={24} color="#8adbd2" />
+          <Text style={styles.bottomNavText}>Favoriler</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.bottomNavItem}
           onPress={() => navigation.navigate("MessagesArea")}
         >
-          <IconView name="message-text" size={24} color="#8adbd2" />
-          <Text style={styles.footerButtonText}>Mesajlar</Text>
+          <FontAwesomeIcon icon={faEnvelope} size={24} color="#8adbd2" />
+          <Text style={styles.bottomNavText}>Mesajlarım</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -799,17 +885,17 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   addButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
     backgroundColor: "#8adbd2",
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: "center",
     alignItems: "center",
-    bottom: 15,
+    marginBottom: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
     elevation: 5,
   },
   addButtonText: {
@@ -991,6 +1077,28 @@ const styles = StyleSheet.create({
   selectedCategoryName: {
     color: "#8adbd2",
     fontWeight: "bold",
+  },
+  bottomNav: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  bottomNavItem: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bottomNavText: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 4,
   },
 });
 
