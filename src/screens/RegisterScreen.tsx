@@ -15,6 +15,7 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../Types";
 import apiurl from "../Apiurl";
 import { useNavigation } from "@react-navigation/native";
+import TokenService from "../services/TokenService";
 
 type RegisterScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -112,8 +113,20 @@ const RegisterScreen = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Başarılı giriş durumunda ana sayfaya yönlendir
-        navigation.replace("Home");
+        // Token'ı kaydet
+        if (data.token) {
+          console.log("Alınan Token:", data.token);
+          console.log(
+            "Decode edilmiş token:",
+            TokenService.decodeToken(data.token)
+          );
+
+          await TokenService.setToken(data.token);
+          // Başarılı giriş durumunda ana sayfaya yönlendir
+          navigation.replace("Home");
+        } else {
+          setError("Token alınamadı. Lütfen tekrar deneyin.");
+        }
       } else {
         // Hata durumunda kullanıcıya bilgi ver
         setError(
@@ -122,6 +135,7 @@ const RegisterScreen = () => {
         );
       }
     } catch (error) {
+      console.error("Login hatası:", error);
       setError("Bir hata oluştu. Lütfen tekrar deneyin.");
     }
   };
@@ -218,6 +232,27 @@ const RegisterScreen = () => {
                   placeholder="Şifre Tekrar"
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
+                  secureTextEntry
+                />
+              </>
+            )}
+
+            {activeTab === "login" && (
+              <>
+                <TextInput
+                  style={styles.input}
+                  placeholder="E-posta"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+
+                <TextInput
+                  style={styles.input}
+                  placeholder="Şifre"
+                  value={password}
+                  onChangeText={setPassword}
                   secureTextEntry
                 />
               </>

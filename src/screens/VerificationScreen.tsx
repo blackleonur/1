@@ -70,25 +70,28 @@ const VerificationScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
+    const requestData = {
+      fullName: userData.fullName,
+      email: userData.email,
+      phoneNumber: userData.phoneNumber,
+      password: userData.password,
+    };
+
+    console.log("Gönderilen veriler:", requestData);
+
     try {
-      // Backend'e kayıt isteği gönder
       const response = await fetch(`${apiurl}/api/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          fullName: userData.fullName,
-          email: userData.email,
-          phoneNumber: userData.phoneNumber,
-          password: userData.password,
-          verificationCode: enteredCode,
-        }),
+        body: JSON.stringify(requestData),
       });
 
       const data = await response.json();
+      console.log("Backend yanıtı:", data);
 
-      if (response.ok && data.message === "User registered successfully") {
+      if (response.ok) {
         // Hoş geldiniz modalını göster
         setShowWelcomeModal(true);
 
@@ -109,9 +112,16 @@ const VerificationScreen: React.FC<Props> = ({ navigation }) => {
           });
         }, 3000);
       } else {
-        Alert.alert("Hata", data.message || "Doğrulama kodu hatalı.");
+        Alert.alert(
+          "Şifre Gereksinimleri",
+          "Şifreniz aşağıdaki kriterleri karşılamalıdır:\n\n" +
+            "• En az bir özel karakter (!@#$%^&* vb.)\n" +
+            "• En az bir küçük harf (a-z)\n" +
+            "• En az bir büyük harf (A-Z)"
+        );
       }
     } catch (error) {
+      console.error("Hata detayı:", error);
       Alert.alert("Hata", "Bir hata oluştu. Lütfen tekrar deneyin.");
     }
   };

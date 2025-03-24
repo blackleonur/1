@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -48,180 +48,298 @@ type Props = {
 };
 
 type Category = {
-  id: string;
+  id: number;
   name: string;
   icon: string;
-  parentId?: string; // Alt kategori için üst kategori ID'si
+  parentId?: number;
 };
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [showAd, setShowAd] = useState<boolean>(true);
+  const [selectedCategory, setSelectedCategory] = useState<number | "all">(
+    "all"
+  );
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
+  const [selectedMainCategory, setSelectedMainCategory] = useState<
+    number | "all"
+  >("all");
   const [priceRange, setPriceRange] = useState<{ min: string; max: string }>({
     min: "",
     max: "",
   });
   const [selectedLocation, setSelectedLocation] = useState<string>("");
 
-  const [categories, setCategories] = useState<Category[]>([
-    // Ana kategoriler
-    { id: "all", name: "Tümü", icon: "view-grid" },
-    { id: "electronics", name: "Elektronik", icon: "cellphone" },
-    { id: "cars", name: "Araçlar", icon: "car" },
-    { id: "home", name: "Ev", icon: "home" },
-    { id: "garden", name: "Bahçe", icon: "flower" },
-    { id: "sports", name: "Spor", icon: "basketball" },
-    { id: "books", name: "Kitap", icon: "book-open-variant" },
-    { id: "clothing", name: "Giyim", icon: "tshirt-crew" },
-    { id: "furniture", name: "Mobilya", icon: "sofa" },
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [vehicleCategories, setVehicleCategories] = useState<Category[]>([]);
 
-    // Elektronik alt kategorileri
-    {
-      id: "phones",
-      name: "Telefonlar",
-      icon: "cellphone",
-      parentId: "electronics",
-    },
-    {
-      id: "computers",
-      name: "Bilgisayarlar",
-      icon: "laptop",
-      parentId: "electronics",
-    },
-    {
-      id: "tablets",
-      name: "Tabletler",
-      icon: "tablet",
-      parentId: "electronics",
-    },
-    {
-      id: "tv",
-      name: "Televizyonlar",
-      icon: "television",
-      parentId: "electronics",
-    },
+  // Yenileme durumu için yeni state
+  const [refreshing, setRefreshing] = useState(false);
 
-    // Araçlar alt kategorileri
-    { id: "cars_new", name: "Sıfır Araçlar", icon: "car", parentId: "cars" },
-    { id: "cars_used", name: "İkinci El", icon: "car-side", parentId: "cars" },
-    {
-      id: "motorcycles",
-      name: "Motosikletler",
-      icon: "motorcycle",
-      parentId: "cars",
-    },
-    {
-      id: "commercial",
-      name: "Ticari Araçlar",
-      icon: "truck",
-      parentId: "cars",
-    },
+  const [allAdverts, setAllAdverts] = useState<Advert[]>([]);
 
-    // Ev alt kategorileri
-    { id: "apartment", name: "Daire", icon: "home", parentId: "home" },
-    { id: "villa", name: "Villa", icon: "home", parentId: "home" },
-    { id: "land", name: "Arsa", icon: "map", parentId: "home" },
-    {
-      id: "workplace",
-      name: "İş Yeri",
-      icon: "office-building",
-      parentId: "home",
-    },
-  ]);
-
-  const [selectedMainCategory, setSelectedMainCategory] =
-    useState<string>("all");
-
-  // Görüntülenecek kategorileri belirle
-  const displayedCategories = useMemo(() => {
-    if (selectedMainCategory === "all") {
-      return categories.filter((cat) => !cat.parentId); // Sadece ana kategorileri göster
-    } else {
-      // Seçili ana kategoriye ait alt kategorileri göster
-      return categories.filter((cat) => cat.parentId === selectedMainCategory);
-    }
-  }, [selectedMainCategory, categories]);
-
-  // Kategori seçim işleyicisini güncelle
-  const handleCategorySelect = (categoryId: string) => {
-    const category = categories.find((cat) => cat.id === categoryId);
-
-    if (category?.parentId) {
-      // Alt kategori seçildi
-      setSelectedCategory(categoryId);
-    } else {
-      // Ana kategori seçildi
-      if (selectedMainCategory === categoryId) {
-        // Aynı ana kategori tekrar seçilirse ana kategorilere dön
-        setSelectedMainCategory("all");
-      } else {
-        setSelectedMainCategory(categoryId);
+  // İlanları getiren fonksiyon
+  const fetchAdverts = async () => {
+    try {
+      const response = await fetch(`${apiurl}/api/adverts`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      const data = await response.json();
+      setAllAdverts(data);
+    } catch (error) {
+      console.error("İlanlar yüklenirken hata oluştu:", error);
+      setAllAdverts([]);
     }
   };
 
-  const [allAdverts, setAllAdverts] = useState<Advert[]>([
-    // Elektronik - Telefon ilanları
-    {
-      id: "1",
-      title: "iPhone 13 Pro",
-      description:
-        "Mükemmel durumda, kutulu iPhone 13 Pro. Hiç çizik yok, batarya sağlığı %95.",
-      price: 25000,
-      image: "data",
-      location: "İstanbul",
-      date: "2023-05-15",
-      sellerName: "Ahmet Yılmaz",
-      distance: "7 km",
-      category: "phones", // "electronics" yerine "phones"
-    },
-    // Elektronik - Bilgisayar ilanları
-    {
-      id: "2",
-      title: "MacBook Pro M1",
-      description:
-        "Az kullanılmış MacBook Pro M1. Kutusunda, tüm aksesuarları tam.",
-      price: 35000,
-      image: "dfgdfg",
-      location: "Ankara",
-      date: "2023-05-26",
-      sellerName: "Kemal Demir",
-      distance: "15 km",
-      category: "computers", // "cars" yerine "computers"
-    },
-    // Araçlar - Sıfır Araç ilanları
-    {
-      id: "8",
-      title: "2023 Toyota Corolla",
-      description:
-        "2023 model Toyota Corolla 1.6 Vision, otomatik vites. Sıfır araç.",
-      price: 750000,
-      image:
-        "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRFzIBhdowkGzgMRCwZDFbObLqpDf17tyNTzQ&s",
-      location: "İzmir",
-      date: "2023-05-24",
-      sellerName: "Selin Kaya",
-      distance: "8 km",
-      category: "cars_new", // "cars" yerine "cars_new"
-    },
-    // Araçlar - İkinci El ilanları
-    {
-      id: "9",
-      title: "2018 Honda Civic",
-      description:
-        "2018 model Honda Civic 1.6 Executive, otomatik vites. Tek sahibinden, garaj arabası.",
-      price: 820000,
-      image:
-        "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRFzIBhdowkGzgMRCwZDFbObLqpDf17tyNTzQ&s",
-      location: "İzmir",
-      date: "2023-05-24",
-      sellerName: "Selin Kaya",
-      distance: "8 km",
-      category: "cars_used", // "cars" yerine "cars_used"
-    },
-  ]);
+  // Yenileme fonksiyonu
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+
+    Promise.all([
+      fetchCategories(),
+      fetchAdverts(),
+      selectedMainCategory === 1 ? fetchVehicleCategories() : Promise.resolve(),
+    ]).finally(() => {
+      setRefreshing(false);
+    });
+  }, [selectedMainCategory]);
+
+  useEffect(() => {
+    fetchCategories();
+    fetchAdverts();
+    if (selectedMainCategory === 1) {
+      fetchVehicleCategories();
+    }
+  }, [selectedMainCategory]);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch(`${apiurl}/api/categories`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!data || !data.$values) {
+        console.error("API'den geçersiz veri formatı:", data);
+        return;
+      }
+
+      // Ana kategorileri işle
+      const processedCategories = data.$values.map((category: any) => {
+        let icon = "view-grid";
+
+        // Ana kategoriler için (id 1-8 arası) özel ikonlar
+        if (category.id >= 1 && category.id <= 8) {
+          switch (category.id) {
+            case 1:
+              icon = "car"; // Vasıta
+              break;
+            case 2:
+              icon = "home"; // Emlak
+              break;
+            case 3:
+              icon = "cellphone"; // Telefon
+              break;
+            case 4:
+              icon = "laptop"; // Elektronik
+              break;
+            case 5:
+              icon = "sofa"; // Ev & Yaşam
+              break;
+            case 6:
+              icon = "tshirt-crew"; // Giyim & Aksesuar
+              break;
+            case 7:
+              icon = "flower"; // Kişisel Bakım
+              break;
+            case 8:
+              icon = "view-grid"; // Diğer
+              break;
+          }
+        }
+
+        // Ana kategoriyi ekle
+        const mainCategory = {
+          id: category.id,
+          name: category.name,
+          icon,
+        };
+
+        // Alt kategorileri işle (eğer varsa)
+        const subCategories = category.children?.$values
+          ? category.children.$values.map((child: any) => ({
+              id: child.id,
+              name: child.name,
+              parentId: category.id,
+              icon: "view-grid", // Alt kategoriler için varsayılan icon
+            }))
+          : [];
+
+        // Ana kategori ve alt kategorileri birleştir
+        return [mainCategory, ...subCategories];
+      });
+
+      // Tüm kategorileri düzleştir ve tekrar eden kategorileri filtrele
+      const flattenedCategories = processedCategories.flat();
+      const uniqueCategories = flattenedCategories.filter(
+        (category: Category, index: number, self: Category[]) =>
+          index === self.findIndex((c: Category) => c.id === category.id)
+      );
+
+      setCategories(uniqueCategories);
+    } catch (error) {
+      console.error("Kategoriler yüklenirken hata oluştu:", error);
+      setCategories([
+        { id: 1, name: "Vasıta", icon: "car" },
+        { id: 2, name: "Emlak", icon: "home" },
+        { id: 3, name: "Telefon", icon: "cellphone" },
+        { id: 4, name: "Elektronik", icon: "laptop" },
+        { id: 5, name: "Ev & Yaşam", icon: "sofa" },
+        { id: 6, name: "Giyim & Aksesuar", icon: "tshirt-crew" },
+        { id: 7, name: "Kişisel Bakım", icon: "flower" },
+        { id: 8, name: "Diğer", icon: "view-grid" },
+      ]);
+    }
+  };
+
+  const fetchVehicleCategories = async () => {
+    try {
+      const response = await fetch(`${apiurl}/api/vehicle-categories`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Tüm alt kategorileri düz bir diziye çeviren yardımcı fonksiyon
+      const flattenCategories = (
+        category: any,
+        parentId?: number
+      ): Category[] => {
+        if (!category || !category.id) return [];
+
+        const current: Category = {
+          id: category.id,
+          name: category.name,
+          icon: category.children?.$values?.length ? "car" : "view-grid",
+          parentId: parentId,
+        };
+
+        if (!category.children?.$values?.length) {
+          return [current];
+        }
+
+        const children = category.children.$values
+          .map((child: any) => flattenCategories(child, category.id))
+          .flat();
+
+        return [current, ...children];
+      };
+
+      const allCategories = flattenCategories(data);
+      setVehicleCategories(allCategories);
+    } catch (error) {
+      console.error("Araç kategorileri yüklenirken hata oluştu:", error);
+    }
+  };
+
+  // Görüntülenecek kategorileri belirle
+  const displayedCategories = useMemo(() => {
+    const validCategories = (cats: Category[]) =>
+      cats.filter(
+        (cat): cat is Category => typeof cat?.id === "number" && !isNaN(cat.id)
+      );
+
+    if (selectedMainCategory === "all") {
+      return validCategories(categories.filter((cat) => !cat.parentId));
+    } else if (selectedMainCategory === 1) {
+      // Seçili kategori varsa
+      if (selectedCategory !== "all" && selectedCategory !== 1) {
+        const hasChildren = vehicleCategories.some(
+          (cat) => cat.parentId === selectedCategory
+        );
+
+        if (hasChildren) {
+          // Alt kategorileri varsa onları göster
+          return validCategories(
+            vehicleCategories.filter((cat) => cat.parentId === selectedCategory)
+          );
+        } else {
+          // Alt kategorisi yoksa sadece seçili kategoriyi göster
+          return validCategories(
+            vehicleCategories.filter((cat) => cat.id === selectedCategory)
+          );
+        }
+      }
+      // Ana vasıta kategorisindeyse, ilk seviye alt kategorileri göster
+      return validCategories(
+        vehicleCategories.filter((cat) => cat.parentId === 1)
+      );
+    } else {
+      // Diğer kategoriler için
+      const hasChildren = categories.some(
+        (cat) => cat.parentId === selectedMainCategory
+      );
+
+      if (hasChildren) {
+        return validCategories(
+          categories.filter((cat) => cat.parentId === selectedMainCategory)
+        );
+      } else {
+        return validCategories(
+          categories.filter((cat) => cat.id === selectedMainCategory)
+        );
+      }
+    }
+  }, [selectedMainCategory, selectedCategory, categories, vehicleCategories]);
+
+  // Geri butonu için yeni fonksiyon
+  const handleBackButton = () => {
+    if (selectedCategory !== "all") {
+      // Alt kategoriden bir üst kategoriye dön
+      const parentCategory = vehicleCategories.find(
+        (cat) => cat.id === selectedCategory
+      )?.parentId;
+      if (parentCategory) {
+        setSelectedCategory(parentCategory);
+      } else {
+        setSelectedCategory("all");
+      }
+    } else {
+      // Ana kategorilere dön
+      setSelectedMainCategory("all");
+      setSelectedCategory("all");
+    }
+  };
+
+  // handleCategorySelect fonksiyonunu güncelle
+  const handleCategorySelect = (categoryId: number) => {
+    const category =
+      selectedMainCategory === 1
+        ? vehicleCategories.find((cat) => cat.id === categoryId)
+        : categories.find((cat) => cat.id === categoryId);
+
+    if (selectedMainCategory === 1) {
+      // Vasıta kategorisi içindeyiz
+      const hasChildren = vehicleCategories.some(
+        (cat) => cat.parentId === categoryId
+      );
+      setSelectedCategory(categoryId); // Her durumda kategoriyi seç
+    } else {
+      // Diğer ana kategoriler
+      if (category?.parentId) {
+        setSelectedCategory(categoryId);
+      } else {
+        setSelectedMainCategory(categoryId);
+        setSelectedCategory("all");
+      }
+    }
+  };
 
   // Filtrelenmiş ilanları hesapla
   const filteredAdverts = useMemo(() => {
@@ -231,7 +349,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     if (selectedCategory !== "all") {
       // Alt kategori seçilmişse sadece o kategorinin ilanlarını göster
       filtered = filtered.filter(
-        (advert) => advert.category === selectedCategory
+        (advert) => Number(advert.category) === selectedCategory
       );
     } else if (selectedMainCategory !== "all") {
       // Ana kategori seçilmişse, o kategoriye ait tüm alt kategorilerin ilanlarını göster
@@ -240,7 +358,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         .map((cat) => cat.id);
 
       filtered = filtered.filter((advert) =>
-        subCategories.includes(advert.category)
+        subCategories.includes(Number(advert.category))
       );
     }
 
@@ -341,13 +459,15 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       {/* Kategoriler */}
       <View style={styles.categoriesContainer}>
-        {selectedMainCategory !== "all" && (
+        {(selectedMainCategory !== "all" || selectedCategory !== "all") && (
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => setSelectedMainCategory("all")}
+            onPress={handleBackButton}
           >
             <FontAwesomeIcon icon={faArrowLeft} size={16} color="#8adbd2" />
-            <Text style={styles.backButtonText}>Ana Kategoriler</Text>
+            <Text style={styles.backButtonText}>
+              {selectedCategory !== "all" ? "Geri" : "Ana Kategoriler"}
+            </Text>
           </TouchableOpacity>
         )}
         <ScrollView
@@ -357,7 +477,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         >
           {displayedCategories.map((category) => (
             <TouchableOpacity
-              key={category.id}
+              key={`category-${category.id}`}
               style={[
                 styles.categoryItem,
                 selectedCategory === category.id && styles.selectedCategoryItem,
@@ -391,46 +511,14 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         </ScrollView>
       </View>
 
-      {/* Google AdMob Reklam Alanı */}
-      {showAd && (
-        <View style={styles.adMobContainer}>
-          <View style={styles.adMobBadge}>
-            <Text style={styles.adMobBadgeText}>Reklam</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.adCloseButton}
-            onPress={() => setShowAd(false)}
-          >
-            <Text style={styles.adCloseIcon}>✕</Text>
-          </TouchableOpacity>
-          <View style={styles.adMobContent}>
-            <Image
-              source={{ uri: "https://picsum.photos/400/100" }}
-              style={styles.adMobImage}
-              resizeMode="cover"
-            />
-            <View style={styles.adMobOverlay}>
-              <View style={styles.googleAdInfo}>
-                <Text style={styles.adMobAppName}>Getir</Text>
-                <Text style={styles.adMobAppDesc}>
-                  Getirle siparişler hemen kapında
-                </Text>
-                <View style={styles.adMobRating}>
-                  <Text style={styles.adMobRatingText}>4.5 ★</Text>
-                  <Text style={styles.adMobInstallText}>İNDİR</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-      )}
-
       <FlatList
         data={filteredAdverts}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
       />
 
       {/* Filtreleme Modalı */}
@@ -729,117 +817,6 @@ const styles = StyleSheet.create({
     color: "white",
     marginTop: 2,
   },
-  adMobContainer: {
-    marginHorizontal: 10,
-    marginVertical: 10,
-    borderRadius: 8,
-    overflow: "hidden",
-    height: 100,
-    backgroundColor: "#fff",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-    position: "relative",
-  },
-  adMobBadge: {
-    position: "absolute",
-    top: 4,
-    left: 4,
-    backgroundColor: "#FFCC66",
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 2,
-    zIndex: 10,
-  },
-  adMobBadgeText: {
-    color: "#333",
-    fontSize: 10,
-    fontWeight: "bold",
-  },
-  adMobContent: {
-    flex: 1,
-    flexDirection: "row",
-  },
-  adMobImage: {
-    width: "100%",
-    height: "100%",
-  },
-  adMobOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "rgba(255,255,255,0.85)",
-    padding: 8,
-    height: 50,
-  },
-  googleAdInfo: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  adMobAppName: {
-    fontWeight: "bold",
-    fontSize: 14,
-    color: "#333",
-    flex: 2,
-  },
-  adMobAppDesc: {
-    fontSize: 12,
-    color: "#666",
-    flex: 3,
-    marginHorizontal: 5,
-  },
-  adMobRating: {
-    flexDirection: "column",
-    alignItems: "center",
-    flex: 2,
-  },
-  adMobRatingText: {
-    fontSize: 12,
-    color: "#333",
-    marginBottom: 3,
-  },
-  adMobInstallText: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#4285F4",
-    backgroundColor: "#E8F0FE",
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-  adCloseButton: {
-    position: "absolute",
-    top: 4,
-    right: 4,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 10,
-  },
-  adCloseIcon: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "bold",
-    lineHeight: 14,
-  },
-  selectedCategoryItem: {
-    // Seçili kategori için stil
-  },
-  selectedCategoryIconContainer: {
-    backgroundColor: "#8adbd2",
-  },
-  selectedCategoryName: {
-    color: "#8adbd2",
-    fontWeight: "bold",
-  },
   // Arama ve Filtreleme Stilleri
   searchContainer: {
     flexDirection: "row",
@@ -1004,6 +981,16 @@ const styles = StyleSheet.create({
     color: "#8adbd2",
     fontSize: 14,
     fontWeight: "500",
+  },
+  selectedCategoryItem: {
+    // Seçili kategori için stil
+  },
+  selectedCategoryIconContainer: {
+    backgroundColor: "#8adbd2",
+  },
+  selectedCategoryName: {
+    color: "#8adbd2",
+    fontWeight: "bold",
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   Alert,
   Modal,
   FlatList,
+  Dimensions,
+  Platform,
 } from "react-native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../Types";
@@ -25,6 +27,11 @@ import {
   faPlus,
 } from "@fortawesome/free-solid-svg-icons";
 import apiurl from "../Apiurl";
+import MapView, { Marker } from "react-native-maps";
+import * as Location from "expo-location";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
+import TokenService from "../services/TokenService";
 
 type AddAdvertScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -37,67 +44,409 @@ type Props = {
 
 // Kategori tipleri
 type Category = {
-  id: string;
+  id: number;
   name: string;
-  subCategories: SubCategory[];
-};
-
-type SubCategory = {
-  id: string;
-  name: string;
+  parentId?: number;
+  icon?: string;
 };
 
 const AddAdvertScreen: React.FC<Props> = ({ navigation }) => {
-  // Kategoriler
-  const categories: Category[] = [
-    {
-      id: "1",
-      name: "Ev Eşyaları",
-      subCategories: [
-        { id: "1-1", name: "Mutfak Eşyaları" },
-        { id: "1-2", name: "Temizlik Eşyaları" },
-        { id: "1-3", name: "Mobilya" },
-      ],
-    },
-    {
-      id: "2",
-      name: "Elektronik",
-      subCategories: [
-        { id: "2-1", name: "Bilgisayar" },
-        { id: "2-2", name: "Telefon" },
-        { id: "2-3", name: "Tablet" },
-      ],
-    },
-  ];
-
   // State'ler
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [address, setAddress] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(
-    null
-  );
-  const [selectedSubCategory, setSelectedSubCategory] =
-    useState<SubCategory | null>(null);
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [showSubCategoryModal, setShowSubCategoryModal] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [vehicleCategories, setVehicleCategories] = useState<Category[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
   const [currentStep, setCurrentStep] = useState(1);
   const scrollViewRef = useRef<ScrollView>(null);
+  const [showPicker, setShowPicker] = useState(false);
+  const [currentPickerLevel, setCurrentPickerLevel] = useState(1);
+  const [showMap, setShowMap] = useState(false);
+  const [location, setLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [addressDetails, setAddressDetails] = useState({
+    city: "",
+    district: "",
+    neighborhood: "",
+    street: "",
+    latitude: 0,
+    longitude: 0,
+  });
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
-  // Fotoğraf ekleme fonksiyonu (simüle edilmiş)
-  const addPhoto = () => {
+  // Araç kategorilerini getiren fonksiyon
+  const fetchVehicleCategories = async () => {
+    try {
+      const response = await fetch(`${apiurl}/api/vehicle-categories`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Tüm alt kategorileri düz bir diziye çeviren yardımcı fonksiyon
+      const flattenCategories = (
+        category: any,
+        parentId?: number
+      ): Category[] => {
+        if (!category || !category.id) return [];
+
+        const current: Category = {
+          id: category.id,
+          name: category.name,
+          icon: category.children?.$values?.length ? "car" : "view-grid",
+          parentId: parentId,
+        };
+
+        if (!category.children?.$values?.length) {
+          return [current];
+        }
+
+        const children = category.children.$values
+          .map((child: any) => flattenCategories(child, category.id))
+          .flat();
+
+        return [current, ...children];
+      };
+
+      const allCategories = flattenCategories(data);
+
+      // Tekrar eden kategorileri filtrele
+      const uniqueCategories = allCategories.filter(
+        (category, index, self) =>
+          index === self.findIndex((c) => c.id === category.id)
+      );
+
+      setVehicleCategories(uniqueCategories);
+    } catch (error) {
+      console.error("Araç kategorileri yüklenirken hata oluştu:", error);
+    }
+  };
+
+  // Kategorileri getiren fonksiyon
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch(`${apiurl}/api/categories`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+
+      if (!data || !data.$values) {
+        console.error("API'den geçersiz veri formatı:", data);
+        return;
+      }
+
+      const flattenCategories = (
+        category: any,
+        parentId?: number
+      ): Category[] => {
+        if (!category || !category.id) return [];
+
+        const current: Category = {
+          id: category.id,
+          name: category.name,
+          parentId: parentId,
+        };
+
+        if (!category.children?.$values?.length) {
+          return [current];
+        }
+
+        const children = category.children.$values
+          .map((child: any) => flattenCategories(child, category.id))
+          .flat();
+
+        return [current, ...children];
+      };
+
+      const allCategories = data.$values
+        .map((category: any) => flattenCategories(category))
+        .flat();
+
+      // Tekrar eden kategorileri filtrele
+      const uniqueCategories = allCategories.filter(
+        (category: Category, index: number, self: Category[]) =>
+          index === self.findIndex((c: Category) => c.id === category.id)
+      );
+
+      setCategories(uniqueCategories);
+    } catch (error) {
+      console.error("Kategoriler yüklenirken hata oluştu:", error);
+      setCategories([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    // Eğer seçili kategori araç kategorisi (id: 1) ise, araç kategorilerini getir
+    if (selectedCategories[0] === 1) {
+      fetchVehicleCategories();
+    }
+  }, [selectedCategories]);
+
+  // Kategori seçme fonksiyonu
+  const handleCategorySelect = (categoryId: number, level: number) => {
+    // Seçilen seviyeden sonraki tüm seçimleri temizle
+    const newSelectedCategories = selectedCategories.slice(0, level);
+
+    // Yeni kategoriyi ekle
+    newSelectedCategories[level] = categoryId;
+    setSelectedCategories(newSelectedCategories);
+
+    // Eğer seçilen kategori araç kategorisi ise, araç kategorilerini getir
+    if (categoryId === 1 && level === 0) {
+      fetchVehicleCategories();
+    }
+  };
+
+  // Kategori seviyesini render etme
+  const renderCategoryLevel = (level: number) => {
+    // Eğer önceki seviye seçilmemişse, bu seviyeyi gösterme
+    if (level > 0 && !selectedCategories[level - 1]) {
+      return null;
+    }
+
+    let categoryList: Category[] = [];
+    const parentId = level === 0 ? undefined : selectedCategories[level - 1];
+
+    if (level === 0) {
+      // Ana kategoriler
+      categoryList = categories.filter((cat) => !cat.parentId);
+    } else if (selectedCategories[0] === 1 && level === 1) {
+      // Araç alt kategorileri
+      categoryList = vehicleCategories.filter((cat) => cat.parentId === 1);
+    } else if (selectedCategories[0] === 1 && level > 1) {
+      // Araç alt-alt kategorileri
+      categoryList = vehicleCategories.filter(
+        (cat) => cat.parentId === selectedCategories[level - 1]
+      );
+    } else {
+      // Diğer kategorilerin alt kategorileri
+      categoryList = categories.filter((cat) => cat.parentId === parentId);
+    }
+
+    if (categoryList.length === 0) return null;
+
+    if (level === 0) {
+      // Ana kategoriler için grid görünümü
+      return (
+        <View key={`level-${level}`} style={styles.categoryLevel}>
+          <Text style={styles.inputLabel}>Ana Kategori</Text>
+          <View style={styles.categoriesContainer}>
+            {categoryList.map((category) => (
+              <TouchableOpacity
+                key={`cat-${level}-${category.id}`}
+                style={[
+                  styles.categoryButton,
+                  selectedCategories[level] === category.id &&
+                    styles.selectedCategoryButton,
+                ]}
+                onPress={() => handleCategorySelect(category.id, level)}
+              >
+                <Text
+                  style={[
+                    styles.categoryButtonText,
+                    selectedCategories[level] === category.id &&
+                      styles.selectedCategoryButtonText,
+                  ]}
+                >
+                  {category.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      );
+    } else {
+      // Alt kategoriler için picker butonu
+      const selectedCategory = categoryList.find(
+        (cat) => cat.id === selectedCategories[level]
+      );
+
+      return (
+        <View key={`level-${level}`} style={styles.categoryLevel}>
+          <Text style={[styles.inputLabel, { marginTop: 20 }]}>
+            {`${level}. Alt Kategori`}
+          </Text>
+          <TouchableOpacity
+            style={styles.pickerButton}
+            onPress={() => {
+              setCurrentPickerLevel(level);
+              setShowPicker(true);
+            }}
+          >
+            <Text style={styles.pickerButtonText}>
+              {selectedCategory ? selectedCategory.name : "Alt kategori seçin"}
+            </Text>
+            <FontAwesomeIcon icon={faChevronDown} size={16} color="#666" />
+          </TouchableOpacity>
+        </View>
+      );
+    }
+  };
+
+  // Picker modalını render etme
+  const renderPickerModal = () => {
+    let categoryList: Category[] = [];
+    const parentId =
+      currentPickerLevel === 0
+        ? undefined
+        : selectedCategories[currentPickerLevel - 1];
+
+    if (selectedCategories[0] === 1 && currentPickerLevel === 1) {
+      categoryList = vehicleCategories.filter((cat) => cat.parentId === 1);
+    } else if (selectedCategories[0] === 1 && currentPickerLevel > 1) {
+      categoryList = vehicleCategories.filter(
+        (cat) => cat.parentId === selectedCategories[currentPickerLevel - 1]
+      );
+    } else {
+      categoryList = categories.filter((cat) => cat.parentId === parentId);
+    }
+
+    return (
+      <Modal
+        visible={showPicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text
+                style={styles.modalTitle}
+              >{`${currentPickerLevel}. Alt Kategori Seçin`}</Text>
+              <TouchableOpacity onPress={() => setShowPicker(false)}>
+                <Text style={styles.modalCloseButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalContent}>
+              {categoryList.map((category) => (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[
+                    styles.modalItem,
+                    selectedCategories[currentPickerLevel] === category.id &&
+                      styles.selectedModalItem,
+                  ]}
+                  onPress={() => {
+                    handleCategorySelect(category.id, currentPickerLevel);
+                    setShowPicker(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.modalItemText,
+                      selectedCategories[currentPickerLevel] === category.id &&
+                        styles.selectedModalItemText,
+                    ]}
+                  >
+                    {category.name}
+                  </Text>
+                  {(selectedCategories[0] === 1
+                    ? vehicleCategories.some(
+                        (cat) => cat.parentId === category.id
+                      )
+                    : categories.some(
+                        (cat) => cat.parentId === category.id
+                      )) && (
+                    <FontAwesomeIcon
+                      icon={faChevronRight}
+                      size={16}
+                      color={
+                        selectedCategories[currentPickerLevel] === category.id
+                          ? "#8adbd2"
+                          : "#ccc"
+                      }
+                    />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
+  // Sonraki seviyede kategori olup olmadığını kontrol eden fonksiyon
+  const hasNextLevelCategories = (currentLevel: number): boolean => {
+    if (currentLevel < 0) return false;
+
+    const currentCategoryId = selectedCategories[currentLevel];
+    if (!currentCategoryId) return false;
+
+    if (selectedCategories[0] === 1) {
+      // Araç kategorileri için kontrol
+      return vehicleCategories.some(
+        (cat) => cat.parentId === currentCategoryId
+      );
+    } else {
+      // Diğer kategoriler için kontrol
+      return categories.some((cat) => cat.parentId === currentCategoryId);
+    }
+  };
+
+  // Kategori seçiminin tamamlanıp tamamlanmadığını kontrol eden fonksiyon
+  const isCategorySelectionComplete = (): boolean => {
+    let lastSelectedLevel = -1;
+
+    // Son seçili seviyeyi bul
+    for (let i = selectedCategories.length - 1; i >= 0; i--) {
+      if (selectedCategories[i]) {
+        lastSelectedLevel = i;
+        break;
+      }
+    }
+
+    // Son seçili seviyeden sonra alt kategori var mı kontrol et
+    return !hasNextLevelCategories(lastSelectedLevel);
+  };
+
+  // Fotoğraf ekleme fonksiyonu
+  const addPhoto = async () => {
     if (photos.length >= 10) {
       Alert.alert("Uyarı", "En fazla 10 fotoğraf ekleyebilirsiniz.");
       return;
     }
 
-    // Gerçek uygulamada burada kamera veya galeri açılacak
-    // Şimdilik rastgele bir fotoğraf ekleyelim
-    const randomId = Math.floor(Math.random() * 100);
-    const newPhoto = `https://picsum.photos/500/500?random=${randomId}`;
-    setPhotos([...photos, newPhoto]);
+    try {
+      const permissionResult =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permissionResult.granted) {
+        Alert.alert("Hata", "Galeri izni gerekli");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.5,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const asset = result.assets[0];
+        if (asset.base64) {
+          setPhotos([...photos, `data:image/jpeg;base64,${asset.base64}`]);
+        }
+      }
+    } catch (error) {
+      console.error("Fotoğraf seçilirken hata oluştu:", error);
+      Alert.alert("Hata", "Fotoğraf seçilemedi");
+    }
   };
 
   // Fotoğraf silme fonksiyonu
@@ -107,16 +456,277 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }) => {
     setPhotos(newPhotos);
   };
 
-  // İlan ekleme fonksiyonu
-  const addAdvert = () => {
-    // Validasyon kontrolleri
-    if (!selectedCategory) {
-      Alert.alert("Hata", "Lütfen bir kategori seçin.");
-      return;
-    }
+  // Konum izni ve konum alma fonksiyonu
+  const getLocation = async () => {
+    setIsLoadingLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Hata", "Konum izni gerekli");
+        return;
+      }
 
-    if (!selectedSubCategory) {
-      Alert.alert("Hata", "Lütfen bir alt kategori seçin.");
+      const location = await Location.getCurrentPositionAsync({});
+      const newLocation = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      };
+      setLocation(newLocation);
+      setAddressDetails((prev) => ({
+        ...prev,
+        latitude: newLocation.latitude,
+        longitude: newLocation.longitude,
+      }));
+      setShowMap(true);
+    } catch (error) {
+      Alert.alert("Hata", "Konum alınamadı");
+    } finally {
+      setIsLoadingLocation(false);
+    }
+  };
+
+  // Seçilen konumdan adres bilgilerini alma
+  const getAddressFromCoordinates = async (
+    latitude: number,
+    longitude: number
+  ) => {
+    try {
+      const response = await Location.reverseGeocodeAsync({
+        latitude,
+        longitude,
+      });
+
+      if (response && response[0]) {
+        const addressData = response[0];
+        console.log("Alınan adres bilgileri:", addressData);
+
+        const newAddressDetails = {
+          city:
+            addressData.city ||
+            addressData.region ||
+            addressData.subregion ||
+            "",
+          district: addressData.subregion || addressData.district || "",
+          neighborhood: addressData.district || addressData.name || "",
+          street: addressData.street || addressData.name || "",
+          latitude,
+          longitude,
+        };
+
+        setAddressDetails(newAddressDetails);
+
+        const fullAddress = [
+          newAddressDetails.street,
+          newAddressDetails.neighborhood,
+          newAddressDetails.district,
+          newAddressDetails.city,
+        ]
+          .filter(Boolean)
+          .join(", ");
+
+        setAddress(fullAddress);
+
+        console.log("Oluşturulan adres detayları:", newAddressDetails);
+        console.log("Oluşturulan tam adres:", fullAddress);
+
+        const missingFields = Object.entries(newAddressDetails)
+          .filter(
+            ([key, value]) =>
+              !value && key !== "latitude" && key !== "longitude"
+          )
+          .map(([key]) => key);
+
+        if (missingFields.length > 0) {
+          Alert.alert(
+            "Bilgi",
+            "Bazı adres bilgileri eksik. Lütfen eksik bilgileri manuel olarak tamamlayın:\n" +
+              missingFields.join(", ")
+          );
+        }
+      } else {
+        console.log("Adres bilgisi bulunamadı");
+        Alert.alert(
+          "Uyarı",
+          "Bu konum için adres bilgileri bulunamadı. Lütfen adres bilgilerini manuel olarak giriniz."
+        );
+      }
+    } catch (error) {
+      console.error("Adres bilgileri alınırken hata oluştu:", error);
+      Alert.alert(
+        "Hata",
+        "Adres bilgileri alınamadı. Lütfen adres bilgilerini manuel olarak giriniz."
+      );
+    }
+  };
+
+  // Harita üzerinde konum seçildiğinde
+  const handleMapPress = (event: any) => {
+    const { latitude, longitude } = event.nativeEvent.coordinate;
+    setLocation({ latitude, longitude });
+    setAddressDetails((prev) => ({
+      ...prev,
+      latitude,
+      longitude,
+    }));
+    getAddressFromCoordinates(latitude, longitude);
+  };
+
+  // Harita modalı
+  const renderMapModal = () => {
+    return (
+      <Modal
+        visible={showMap}
+        animationType="slide"
+        onRequestClose={() => setShowMap(false)}
+      >
+        <SafeAreaView style={styles.mapContainer}>
+          <View style={styles.mapHeader}>
+            <TouchableOpacity
+              style={styles.mapCloseButton}
+              onPress={() => setShowMap(false)}
+            >
+              <Text style={styles.mapCloseButtonText}>✕</Text>
+            </TouchableOpacity>
+            <Text style={styles.mapTitle}>Konum Seç</Text>
+            <TouchableOpacity
+              style={styles.mapConfirmButton}
+              onPress={() => setShowMap(false)}
+            >
+              <Text style={styles.mapConfirmButtonText}>Onayla</Text>
+            </TouchableOpacity>
+          </View>
+          {location && (
+            <MapView
+              style={styles.map}
+              initialRegion={{
+                latitude: location.latitude,
+                longitude: location.longitude,
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
+              }}
+              onPress={handleMapPress}
+            >
+              <Marker
+                coordinate={{
+                  latitude: location.latitude,
+                  longitude: location.longitude,
+                }}
+              />
+            </MapView>
+          )}
+        </SafeAreaView>
+      </Modal>
+    );
+  };
+
+  // Adres detayları formu
+  const renderAddressDetails = () => {
+    return (
+      <View style={styles.addressDetails}>
+        <View style={styles.addressRow}>
+          <View style={styles.addressField}>
+            <Text style={styles.addressLabel}>Şehir</Text>
+            <TextInput
+              style={styles.addressInput}
+              value={addressDetails.city}
+              onChangeText={(text) => {
+                setAddressDetails({ ...addressDetails, city: text });
+                updateFullAddress({ ...addressDetails, city: text });
+              }}
+              placeholder="Şehir"
+            />
+          </View>
+          <View style={styles.addressField}>
+            <Text style={styles.addressLabel}>İlçe</Text>
+            <TextInput
+              style={styles.addressInput}
+              value={addressDetails.district}
+              onChangeText={(text) => {
+                setAddressDetails({ ...addressDetails, district: text });
+                updateFullAddress({ ...addressDetails, district: text });
+              }}
+              placeholder="İlçe"
+            />
+          </View>
+        </View>
+        <View style={styles.addressRow}>
+          <View style={styles.addressField}>
+            <Text style={styles.addressLabel}>Mahalle</Text>
+            <TextInput
+              style={styles.addressInput}
+              value={addressDetails.neighborhood}
+              onChangeText={(text) => {
+                setAddressDetails({ ...addressDetails, neighborhood: text });
+                updateFullAddress({ ...addressDetails, neighborhood: text });
+              }}
+              placeholder="Mahalle"
+            />
+          </View>
+          <View style={styles.addressField}>
+            <Text style={styles.addressLabel}>Sokak</Text>
+            <TextInput
+              style={styles.addressInput}
+              value={addressDetails.street}
+              onChangeText={(text) => {
+                setAddressDetails({ ...addressDetails, street: text });
+                updateFullAddress({ ...addressDetails, street: text });
+              }}
+              placeholder="Sokak"
+            />
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  // Tam adresi güncelleme
+  const updateFullAddress = (details: typeof addressDetails) => {
+    const fullAddress = [
+      details.street,
+      details.neighborhood,
+      details.district,
+      details.city,
+    ]
+      .filter(Boolean)
+      .join(", ");
+    setAddress(fullAddress);
+  };
+
+  // Adres adımını güncelleme
+  const renderAddressStep = () => {
+    return (
+      <View style={styles.stepContent}>
+        <Text style={styles.inputLabel}>Adres</Text>
+        <View style={styles.addressInputContainer}>
+          <TextInput
+            style={styles.addressInput}
+            value={address}
+            onChangeText={setAddress}
+            placeholder="Adresinizi girin"
+            multiline
+          />
+          <TouchableOpacity
+            style={styles.locationButton}
+            onPress={getLocation}
+            disabled={isLoadingLocation}
+          >
+            <FontAwesomeIcon
+              icon={faMapMarkerAlt}
+              size={20}
+              color={isLoadingLocation ? "#ccc" : "#8adbd2"}
+            />
+          </TouchableOpacity>
+        </View>
+        {renderAddressDetails()}
+      </View>
+    );
+  };
+
+  // İlan ekleme fonksiyonu
+  const addAdvert = async () => {
+    // Validasyon kontrolleri
+    if (selectedCategories.length === 0) {
+      Alert.alert("Hata", "Lütfen bir kategori seçin.");
       return;
     }
 
@@ -145,25 +755,139 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
+    if (addressDetails.latitude === 0 || addressDetails.longitude === 0) {
+      Alert.alert("Hata", "Lütfen haritadan konum seçin.");
+      return;
+    }
+
     if (price.length === 0) {
       Alert.alert("Hata", "Lütfen bir fiyat girin.");
       return;
     }
 
-    // İlan ekleme işlemi burada yapılacak
-    Alert.alert("Başarılı", "İlanınız başarıyla eklendi!", [
-      {
-        text: "Tamam",
-        onPress: () => navigation.navigate("Home"),
-      },
-    ]);
+    try {
+      // Token kontrolü
+      const isValid = await TokenService.isTokenValid();
+      if (!isValid) {
+        Alert.alert(
+          "Hata",
+          "Oturum süreniz dolmuş. Lütfen tekrar giriş yapın."
+        );
+        navigation.navigate("RegisterScreen");
+        return;
+      }
+
+      const token = await TokenService.getToken();
+      if (!token) {
+        Alert.alert(
+          "Hata",
+          "Oturum süreniz dolmuş. Lütfen tekrar giriş yapın."
+        );
+        navigation.navigate("RegisterScreen");
+        return;
+      }
+
+      // Son seçili kategori ID'sini al
+      const lastSelectedCategoryId =
+        selectedCategories[selectedCategories.length - 1];
+
+      // API isteği için veriyi hazırla
+      const advertData = {
+        title: title.trim(),
+        description: description.trim(),
+        price: parseInt(price),
+        imageUrl: "", // Boş string olarak gönderiyoruz
+        categoryId: lastSelectedCategoryId,
+        status: "Beklemede",
+        address: address.trim(),
+        latitude: addressDetails.latitude,
+        longitude: addressDetails.longitude,
+      };
+
+      // Gönderilecek veriyi console'da göster
+      console.log("API'ye gönderilecek veri:", {
+        ...advertData,
+        imageUrl:
+          "base64 formatında fotoğraf (uzunluk: " +
+          advertData.imageUrl.length +
+          " karakter)",
+      });
+
+      // API isteği
+      const response = await fetch(`${apiurl}/api/ad-listings`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(advertData),
+      });
+
+      // Hata durumunda detaylı bilgi al
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log("API Ham Yanıt:", errorText);
+
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = errorText;
+        }
+
+        console.log("API Hata Detayı:", errorData);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("API yanıtı:", result);
+
+      // İlan başarıyla eklendikten sonra görseli yükle
+      if (photos.length > 0) {
+        try {
+          const formData = new FormData();
+          formData.append("file", photos[0]);
+
+          // Görseli yükle
+          const imageResponse = await fetch(`${apiurl}/api/images/upload`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "multipart/form-data",
+            },
+            body: formData,
+          });
+
+          if (!imageResponse.ok) {
+            console.error("Görsel yüklenirken hata oluştu");
+          } else {
+            console.log("Görsel başarıyla yüklendi");
+          }
+        } catch (error) {
+          console.error("Görsel yükleme hatası:", error);
+        }
+      }
+
+      Alert.alert("Başarılı", "İlanınız başarıyla eklendi!", [
+        {
+          text: "Tamam",
+          onPress: () => navigation.navigate("Home"),
+        },
+      ]);
+    } catch (error) {
+      console.error("İlan eklenirken hata oluştu:", error);
+      Alert.alert(
+        "Hata",
+        "İlan eklenirken bir hata oluştu. Lütfen tekrar deneyin."
+      );
+    }
   };
 
   // Sonraki adıma geçme fonksiyonu
   const nextStep = () => {
     if (currentStep === 1) {
-      if (!selectedCategory || !selectedSubCategory) {
-        Alert.alert("Hata", "Lütfen kategori ve alt kategori seçin.");
+      if (!isCategorySelectionComplete()) {
+        Alert.alert("Hata", "Lütfen kategori seçimlerini eksiksiz tamamlayın.");
         return;
       }
     } else if (currentStep === 2) {
@@ -227,48 +951,7 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }) => {
       case 1:
         return (
           <View style={styles.stepContent}>
-            <Text style={styles.inputLabel}>Kategori</Text>
-            <TouchableOpacity
-              style={styles.selectButton}
-              onPress={() => setShowCategoryModal(true)}
-            >
-              <Text style={styles.selectButtonText}>
-                {selectedCategory ? selectedCategory.name : "Kategori Seçin"}
-              </Text>
-              <FontAwesomeIcon icon={faChevronDown} size={16} color="#666" />
-            </TouchableOpacity>
-
-            <Text style={styles.inputLabel}>Alt Kategori</Text>
-            <TouchableOpacity
-              style={[
-                styles.selectButton,
-                !selectedCategory && styles.disabledButton,
-              ]}
-              onPress={() => {
-                if (selectedCategory) {
-                  setShowSubCategoryModal(true);
-                } else {
-                  Alert.alert("Uyarı", "Önce bir kategori seçmelisiniz.");
-                }
-              }}
-              disabled={!selectedCategory}
-            >
-              <Text
-                style={[
-                  styles.selectButtonText,
-                  !selectedCategory && styles.disabledText,
-                ]}
-              >
-                {selectedSubCategory
-                  ? selectedSubCategory.name
-                  : "Alt Kategori Seçin"}
-              </Text>
-              <FontAwesomeIcon
-                icon={faChevronDown}
-                size={16}
-                color={selectedCategory ? "#666" : "#ccc"}
-              />
-            </TouchableOpacity>
+            {[0, 1, 2, 3, 4].map((level) => renderCategoryLevel(level))}
           </View>
         );
       case 2:
@@ -337,26 +1020,7 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         );
       case 4:
-        return (
-          <View style={styles.stepContent}>
-            <Text style={styles.inputLabel}>Adres</Text>
-            <View style={styles.addressInputContainer}>
-              <TextInput
-                style={styles.addressInput}
-                value={address}
-                onChangeText={setAddress}
-                placeholder="Adresinizi girin"
-              />
-              <TouchableOpacity style={styles.locationButton}>
-                <FontAwesomeIcon
-                  icon={faMapMarkerAlt}
-                  size={20}
-                  color="#8adbd2"
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-        );
+        return renderAddressStep();
       case 5:
         return (
           <View style={styles.stepContent}>
@@ -410,84 +1074,8 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       )}
 
-      {/* Kategori Seçim Modalı */}
-      <Modal
-        visible={showCategoryModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowCategoryModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Kategori Seçin</Text>
-              <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
-                <Text style={styles.modalCloseButton}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={categories}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.modalItem}
-                  onPress={() => {
-                    setSelectedCategory(item);
-                    setSelectedSubCategory(null);
-                    setShowCategoryModal(false);
-                  }}
-                >
-                  <Text style={styles.modalItemText}>{item.name}</Text>
-                  <FontAwesomeIcon
-                    icon={faChevronRight}
-                    size={16}
-                    color="#ccc"
-                  />
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
-
-      {/* Alt Kategori Seçim Modalı */}
-      <Modal
-        visible={showSubCategoryModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowSubCategoryModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Alt Kategori Seçin</Text>
-              <TouchableOpacity onPress={() => setShowSubCategoryModal(false)}>
-                <Text style={styles.modalCloseButton}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={selectedCategory?.subCategories || []}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.modalItem}
-                  onPress={() => {
-                    setSelectedSubCategory(item);
-                    setShowSubCategoryModal(false);
-                  }}
-                >
-                  <Text style={styles.modalItemText}>{item.name}</Text>
-                  <FontAwesomeIcon
-                    icon={faChevronRight}
-                    size={16}
-                    color="#ccc"
-                  />
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
+      {renderPickerModal()}
+      {renderMapModal()}
     </SafeAreaView>
   );
 };
@@ -563,13 +1151,6 @@ const styles = StyleSheet.create({
   selectButtonText: {
     fontSize: 16,
     color: "#333",
-  },
-  disabledButton: {
-    borderColor: "#eee",
-    backgroundColor: "#f9f9f9",
-  },
-  disabledText: {
-    color: "#ccc",
   },
   photosContainer: {
     flexDirection: "row",
@@ -697,6 +1278,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: "#999",
   },
+  modalContent: {
+    maxHeight: "70%",
+  },
   modalItem: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -704,10 +1288,117 @@ const styles = StyleSheet.create({
     padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
+    backgroundColor: "#fff",
+  },
+  selectedModalItem: {
+    backgroundColor: "#f0f7ff",
   },
   modalItemText: {
     fontSize: 16,
     color: "#333",
+  },
+  selectedModalItemText: {
+    color: "#8adbd2",
+    fontWeight: "bold",
+  },
+  categoriesContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginHorizontal: -5,
+    marginTop: 10,
+  },
+  categoryButton: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    margin: 5,
+    minWidth: "30%",
+  },
+  selectedCategoryButton: {
+    backgroundColor: "#8adbd2",
+    borderColor: "#8adbd2",
+  },
+  categoryButtonText: {
+    fontSize: 14,
+    color: "#333",
+    textAlign: "center",
+  },
+  selectedCategoryButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  categoryLevel: {
+    marginBottom: 20,
+  },
+  pickerButton: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 15,
+    marginTop: 10,
+  },
+  pickerButtonText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  mapContainer: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  mapHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  mapCloseButton: {
+    padding: 5,
+  },
+  mapCloseButtonText: {
+    fontSize: 20,
+    color: "#333",
+  },
+  mapTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  mapConfirmButton: {
+    padding: 5,
+  },
+  mapConfirmButtonText: {
+    fontSize: 16,
+    color: "#8adbd2",
+    fontWeight: "bold",
+  },
+  map: {
+    flex: 1,
+  },
+  addressDetails: {
+    marginTop: 20,
+  },
+  addressRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 15,
+  },
+  addressField: {
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  addressLabel: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 5,
   },
 });
 
