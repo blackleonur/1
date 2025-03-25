@@ -361,78 +361,107 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, [selectedMainCategory, selectedCategory, categories, vehicleCategories]);
 
-  // Geri butonu için yeni fonksiyon
-  const handleBackButton = () => {
-    if (selectedCategory !== "all") {
-      // Alt kategoriden bir üst kategoriye dön
-      const parentCategory = vehicleCategories.find(
-        (cat) => cat.id === selectedCategory
-      )?.parentId;
-      if (parentCategory) {
-        setSelectedCategory(parentCategory);
+  // Geri butonu için fonksiyonu güncelle
+  const handleBackButton = async () => {
+    try {
+      if (selectedCategory !== "all") {
+        // Alt kategoriden bir üst kategoriye dön
+        const parentCategory = vehicleCategories.find(
+          (cat) => cat.id === selectedCategory
+        )?.parentId;
+        
+        if (parentCategory) {
+          setSelectedCategory(parentCategory);
+          // Üst kategorinin ilanlarını getir
+          await fetchCategoryAdverts(parentCategory);
+        } else {
+          setSelectedCategory("all");
+          // Ana kategorinin ilanlarını getir
+          if (selectedMainCategory !== "all") {
+            await fetchCategoryAdverts(selectedMainCategory);
+          }
+        }
       } else {
+        // Ana kategorilere dön
+        setSelectedMainCategory("all");
         setSelectedCategory("all");
-      }
-    } else {
-      // Ana kategorilere dön
-      setSelectedMainCategory("all");
-      setSelectedCategory("all");
-    }
-  };
-
-  // handleCategorySelect fonksiyonunu güncelle
-  const handleCategorySelect = async (categoryId: number) => {
-    const category =
-      selectedMainCategory === 1
-        ? vehicleCategories.find((cat) => cat.id === categoryId)
-        : categories.find((cat) => cat.id === categoryId);
-
-    if (selectedMainCategory === 1) {
-      // Vasıta kategorisi içindeyiz
-      const hasChildren = vehicleCategories.some(
-        (cat) => cat.parentId === categoryId
-      );
-      setSelectedCategory(categoryId);
-      if (!hasChildren) {
-        // Alt kategori seçildiyse ilanları getir
-        await fetchAdvertsByCategory(categoryId);
-      }
-    } else {
-      // Diğer ana kategoriler
-      if (category?.parentId) {
-        setSelectedCategory(categoryId);
-        await fetchAdvertsByCategory(categoryId);
-      } else {
-        setSelectedMainCategory(categoryId);
-        setSelectedCategory("all");
-        // Ana kategori seçildiğinde tüm ilanları getir
+        // Tüm ilanları getir
         await fetchAdverts();
       }
+    } catch (error) {
+      console.error("Geri dönüşte hata oluştu:", error);
     }
   };
 
-  // Filtrelenmiş ilanları hesapla
+  // handleCategorySelect fonksiyonunu da düzenleyelim
+  const handleCategorySelect = async (categoryId: number) => {
+    try {
+      if (selectedMainCategory === 1) {
+        // Vasıta kategorisi içindeyiz
+        const hasChildren = vehicleCategories.some(
+          (cat) => cat.parentId === categoryId
+        );
+        setSelectedCategory(categoryId);
+        // Her durumda API'ye istek at
+        await fetchCategoryAdverts(categoryId);
+      } else {
+        const category = categories.find((cat) => cat.id === categoryId);
+        if (category?.parentId) {
+          // Alt kategori seçildi
+          setSelectedCategory(categoryId);
+        } else {
+          // Ana kategori seçildi
+          setSelectedMainCategory(categoryId);
+          setSelectedCategory("all");
+        }
+        // Her durumda API'ye istek at
+        await fetchCategoryAdverts(categoryId);
+      }
+    } catch (error) {
+      console.error("Kategori ilanları yüklenirken hata oluştu:", error);
+      setAllAdverts([]);
+    }
+  };
+
+  // API'den kategori ilanlarını getiren yardımcı fonksiyon
+  const fetchCategoryAdverts = async (categoryId: number) => {
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) {
+        console.error("Token bulunamadı");
+        return;
+      }
+
+      const response = await fetch(`${apiurl}/api/ad-listings/category/${categoryId}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data && Array.isArray(data.$values)) {
+        setAllAdverts(data.$values);
+      } else {
+        console.error("API'den geçersiz veri formatı:", data);
+        setAllAdverts([]);
+      }
+    } catch (error) {
+      console.error("Kategori ilanları yüklenirken hata oluştu:", error);
+      setAllAdverts([]);
+    }
+  };
+
+  // filteredAdverts fonksiyonunu basitleştirelim
   const filteredAdverts = useMemo(() => {
     let filtered = allAdverts;
 
-    // Kategori filtresi
-    if (selectedCategory !== "all") {
-      // Alt kategori seçilmişse sadece o kategorinin ilanlarını göster
-      filtered = filtered.filter(
-        (advert) => Number(advert.category) === selectedCategory
-      );
-    } else if (selectedMainCategory !== "all") {
-      // Ana kategori seçilmişse, o kategoriye ait tüm alt kategorilerin ilanlarını göster
-      const subCategories = categories
-        .filter((cat) => cat.parentId === selectedMainCategory)
-        .map((cat) => cat.id);
-
-      filtered = filtered.filter((advert) =>
-        subCategories.includes(Number(advert.category))
-      );
-    }
-
-    // Arama filtresi
+    // Sadece arama filtresi uygula, kategori filtresi API'den geliyor
     if (searchQuery.trim() !== "") {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(
@@ -444,13 +473,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     }
 
     return filtered;
-  }, [
-    allAdverts,
-    selectedCategory,
-    selectedMainCategory,
-    searchQuery,
-    categories,
-  ]);
+  }, [allAdverts, searchQuery]);
 
   // Filtreleri uygula
   const applyFilters = () => {

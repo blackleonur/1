@@ -721,6 +721,29 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }): JSX.Element => {
     );
   };
 
+  // Base64'e çevirme fonksiyonu
+  const convertImageToBase64 = async (uri: string): Promise<string> => {
+    try {
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      
+      console.log("Base64 uzunluğu:", base64.length);
+      if (base64.length === 0) {
+        throw new Error("Base64 dönüşümü başarısız - boş string");
+      }
+      
+      // Base64 prefix'ini ekle
+      const base64WithPrefix = `data:image/jpeg;base64,${base64}`;
+      console.log("Base64 prefix ile başlıyor mu:", base64WithPrefix.startsWith('data:image/jpeg;base64,'));
+      
+      return base64WithPrefix;
+    } catch (error) {
+      console.error("Resim base64'e çevrilirken hata:", error);
+      throw error;
+    }
+  };
+
   // İlan ekleme fonksiyonu
   const addAdvert = async () => {
     // Validasyon kontrolleri
@@ -765,7 +788,6 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }): JSX.Element => {
     }
 
     try {
-      // Token kontrolü ve kullanıcı bilgilerini alma
       const [isValid, token, userData] = await Promise.all([
         TokenService.isTokenValid(),
         TokenService.getToken(),
@@ -773,37 +795,87 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }): JSX.Element => {
       ]);
 
       if (!isValid || !token) {
-        Alert.alert(
-          "Uyarı",
-          "Oturumunuz sonlanmış. Lütfen tekrar giriş yapın."
-        );
+        Alert.alert("Uyarı", "Oturumunuz sonlanmış. Lütfen tekrar giriş yapın.");
         return;
       }
 
-      console.log("Token Durumu:", isValid);
-      console.log("Kullanıcı Bilgileri:", userData);
+      // Önce resmi yükle
+      let imageUrl = "";
+      if (photos.length > 0) {
+        try {
+          const base64Image = await convertImageToBase64(photos[0]);
+          
+          // İstek gövdesini kontrol et
+          const requestBody = {
+            Base64: base64Image,
+            FileName: `image_${Date.now()}.jpg`
+          };
+          
+          console.log("İstek gövdesi uzunluğu:", JSON.stringify(requestBody).length);
+          console.log("Base64 doğru formatta mı:", base64Image.startsWith('data:image/jpeg;base64,'));
+
+          const imageResponse = await fetch(`${apiurl}/api/images/upload-base64`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(requestBody),
+          });
+
+          // Resim yükleme yanıtını kontrol et
+          if (!imageResponse.ok) {
+            const errorText = await imageResponse.text();
+            console.error("Resim yükleme yanıtı:", {
+              status: imageResponse.status,
+              statusText: imageResponse.statusText,
+              body: errorText,
+              headers: Object.fromEntries(imageResponse.headers.entries()) // Yanıt başlıklarını da göster
+            });
+            throw new Error(`Resim yükleme başarısız: ${imageResponse.status} ${errorText}`);
+          }
+
+          const imageResult = await imageResponse.json();
+          console.log("Ham resim yanıtı:", imageResult); // Tüm yanıtı görelim
+          imageUrl = imageResult.url || imageResult.imageUrl || imageResult;
+          if (!imageUrl) {
+            console.warn("Resim URL'i alınamadı:", imageResult);
+          }
+          console.log("Resim başarıyla yüklendi:", imageUrl);
+        } catch (error) {
+          console.error("Resim yükleme hatası detayı:", error);
+          Alert.alert(
+            "Uyarı", 
+            `Resim yüklenirken bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`
+          );
+          return;
+        }
+      }
 
       // Son seçili kategori ID'sini al
-      const lastSelectedCategoryId =
-        selectedCategories[selectedCategories.length - 1];
+      const lastSelectedCategoryId = selectedCategories[selectedCategories.length - 1];
 
-      // API isteği için veriyi hazırla
+      // İlan verilerini hazırla
       const advertData = {
         title: title.trim(),
         description: description.trim(),
         price: parseInt(price),
-        imageUrl: "",
+        imageUrl: imageUrl || null,
         categoryId: lastSelectedCategoryId,
         status: "Beklemede",
         address: address.trim(),
         latitude: addressDetails.latitude,
         longitude: addressDetails.longitude,
+        city: addressDetails.city,
+        district: addressDetails.district,
+        neighborhood: addressDetails.neighborhood,
+        street: addressDetails.street
       };
 
-      // Gönderilecek veriyi console'da göster
-      console.log("API'ye gönderilecek veri:", advertData);
+      // İstek verilerini kontrol et
+      console.log("Gönderilecek ilan verileri:", advertData);
 
-      // API isteği
+      // İlanı ekle
       const response = await fetch(`${apiurl}/api/ad-listings`, {
         method: "POST",
         headers: {
@@ -813,91 +885,18 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }): JSX.Element => {
         body: JSON.stringify(advertData),
       });
 
-      // Hata durumunda detaylı bilgi al
       if (!response.ok) {
         const errorText = await response.text();
-        console.log("API Ham Yanıt:", errorText);
-
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch {
-          errorData = errorText;
-        }
-
-        console.log("API Hata Detayı:", errorData);
-        Alert.alert(
-          "Hata",
-          "İlan eklenirken bir hata oluştu. Lütfen tekrar deneyin."
-        );
-        return;
+        console.error("İlan ekleme yanıtı:", {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+        throw new Error(`İlan ekleme başarısız: ${response.status} ${errorText}`);
       }
 
       const result = await response.json();
-      console.log("API yanıtı:", result);
-
-      // İlan başarıyla eklendikten sonra görseli yükle
-      if (photos.length > 0) {
-        try {
-          const formData = new FormData();
-
-          // URI'den dosya oluştur
-          const fileUri = photos[0];
-          const fileName = fileUri.split("/").pop();
-          const match = /\.(\w+)$/.exec(fileName || "");
-          const type = match ? `image/${match[1]}` : "image";
-
-          formData.append("file", {
-            uri: fileUri,
-            name: fileName,
-            type,
-          } as any);
-
-          console.log("Gönderilecek dosya bilgileri:", {
-            uri: fileUri,
-            name: fileName,
-            type,
-          });
-
-          // Görseli yükle
-          const imageResponse = await fetch(`${apiurl}/api/images/upload`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "multipart/form-data",
-              Authorization: `Bearer ${token}`,
-            },
-            body: formData,
-          });
-
-          const responseText = await imageResponse.text();
-          console.log("Görsel yükleme yanıtı (ham):", responseText);
-
-          if (!imageResponse.ok) {
-            console.error(
-              "Görsel yükleme hatası - Status:",
-              imageResponse.status
-            );
-            console.error("Görsel yükleme hatası - Yanıt:", responseText);
-            Alert.alert(
-              "Uyarı",
-              "Görsel yüklenirken bir hata oluştu. Lütfen tekrar deneyin."
-            );
-          } else {
-            try {
-              const imageResult = JSON.parse(responseText);
-              console.log("Görsel başarıyla yüklendi:", imageResult);
-            } catch (parseError) {
-              console.error("Görsel yanıtı parse edilemedi:", parseError);
-            }
-          }
-        } catch (error) {
-          console.error("Görsel yükleme işlemi hatası:", error);
-          Alert.alert(
-            "Uyarı",
-            "Görsel yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin."
-          );
-        }
-      }
+      console.log("İlan başarıyla eklendi:", result);
 
       Alert.alert("Başarılı", "İlanınız başarıyla eklendi!", [
         {
@@ -905,6 +904,7 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }): JSX.Element => {
           onPress: () => navigation.navigate("Home"),
         },
       ]);
+
     } catch (error) {
       console.error("İlan eklenirken hata oluştu:", error);
       Alert.alert(
