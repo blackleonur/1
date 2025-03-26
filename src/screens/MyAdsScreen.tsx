@@ -92,7 +92,7 @@ const MyAdsScreen: React.FC<Props> = ({ navigation }) => {
             const token = await AsyncStorage.getItem("userToken");
             if (!token) return;
 
-            const response = await fetch(`${apiurl}/api/adverts/${adId}`, {
+            const response = await fetch(`${apiurl}/api/ad-listings/${adId}`, {
               method: "DELETE",
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -101,13 +101,16 @@ const MyAdsScreen: React.FC<Props> = ({ navigation }) => {
             });
 
             if (!response.ok) {
-              throw new Error("İlan silinemedi");
+              const errorData = await response.json();
+              throw new Error(errorData.message || "İlan silinemedi");
             }
 
             setMyAds(myAds.filter((ad) => ad.id !== adId));
             Alert.alert("Başarılı", "İlan başarıyla silindi");
           } catch (error) {
-            Alert.alert("Hata", "İlan silinirken bir hata oluştu");
+            const err = error as Error;
+            Alert.alert("Hata", `İlan silinirken bir hata oluştu: ${err.message}`);
+            console.error("Silme hatası:", err);
           }
         },
       },
@@ -207,7 +210,7 @@ const MyAdsScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.emptyText}>Henüz ilanınız bulunmuyor</Text>
           <TouchableOpacity
             style={styles.addButton}
-            onPress={() => navigation.navigate("AddAdvert")}
+            onPress={() => navigation.navigate("AddAdvert", { adId: undefined })}
           >
             <Text style={styles.addButtonText}>Yeni İlan Ekle</Text>
           </TouchableOpacity>

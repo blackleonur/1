@@ -728,16 +728,11 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }): JSX.Element => {
         encoding: FileSystem.EncodingType.Base64,
       });
       
-      console.log("Base64 uzunluğu:", base64.length);
       if (base64.length === 0) {
         throw new Error("Base64 dönüşümü başarısız - boş string");
       }
       
-      // Base64 prefix'ini ekle
-      const base64WithPrefix = `data:image/jpeg;base64,${base64}`;
-      console.log("Base64 prefix ile başlıyor mu:", base64WithPrefix.startsWith('data:image/jpeg;base64,'));
-      
-      return base64WithPrefix;
+      return base64;
     } catch (error) {
       console.error("Resim base64'e çevrilirken hata:", error);
       throw error;
@@ -788,10 +783,9 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }): JSX.Element => {
     }
 
     try {
-      const [isValid, token, userData] = await Promise.all([
+      const [isValid, token] = await Promise.all([
         TokenService.isTokenValid(),
         TokenService.getToken(),
-        TokenService.getUserData(),
       ]);
 
       if (!isValid || !token) {
@@ -799,55 +793,15 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }): JSX.Element => {
         return;
       }
 
-      // Önce resmi yükle
-      let imageUrl = "";
-      if (photos.length > 0) {
+      // Tüm fotoğrafları base64'e çevir
+      const base64Images: string[] = [];
+      for (const photoUri of photos) {
         try {
-          const base64Image = await convertImageToBase64(photos[0]);
-          
-          // İstek gövdesini kontrol et
-          const requestBody = {
-            Base64: base64Image,
-            FileName: `image_${Date.now()}.jpg`
-          };
-          
-          console.log("İstek gövdesi uzunluğu:", JSON.stringify(requestBody).length);
-          console.log("Base64 doğru formatta mı:", base64Image.startsWith('data:image/jpeg;base64,'));
-
-          const imageResponse = await fetch(`${apiurl}/api/images/upload-base64`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(requestBody),
-          });
-
-          // Resim yükleme yanıtını kontrol et
-          if (!imageResponse.ok) {
-            const errorText = await imageResponse.text();
-            console.error("Resim yükleme yanıtı:", {
-              status: imageResponse.status,
-              statusText: imageResponse.statusText,
-              body: errorText,
-              headers: Object.fromEntries(imageResponse.headers.entries()) // Yanıt başlıklarını da göster
-            });
-            throw new Error(`Resim yükleme başarısız: ${imageResponse.status} ${errorText}`);
-          }
-
-          const imageResult = await imageResponse.json();
-          console.log("Ham resim yanıtı:", imageResult); // Tüm yanıtı görelim
-          imageUrl = imageResult.url || imageResult.imageUrl || imageResult;
-          if (!imageUrl) {
-            console.warn("Resim URL'i alınamadı:", imageResult);
-          }
-          console.log("Resim başarıyla yüklendi:", imageUrl);
+          const base64 = await convertImageToBase64(photoUri);
+          base64Images.push(base64);
         } catch (error) {
-          console.error("Resim yükleme hatası detayı:", error);
-          Alert.alert(
-            "Uyarı", 
-            `Resim yüklenirken bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`
-          );
+          console.error("Resim base64'e çevrilirken hata:", error);
+          Alert.alert("Uyarı", "Bazı resimler yüklenemedi. Lütfen tekrar deneyin.");
           return;
         }
       }
@@ -860,20 +814,19 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation }): JSX.Element => {
         title: title.trim(),
         description: description.trim(),
         price: parseInt(price),
-        imageUrl: imageUrl || null,
         categoryId: lastSelectedCategoryId,
         status: "Beklemede",
         address: address.trim(),
         latitude: addressDetails.latitude,
         longitude: addressDetails.longitude,
-        city: addressDetails.city,
-        district: addressDetails.district,
-        neighborhood: addressDetails.neighborhood,
-        street: addressDetails.street
+        base64Images: base64Images
       };
 
       // İstek verilerini kontrol et
-      console.log("Gönderilecek ilan verileri:", advertData);
+      console.log("Gönderilecek ilan verileri:", {
+        ...advertData,
+        base64Images: `${base64Images.length} adet resim`
+      });
 
       // İlanı ekle
       const response = await fetch(`${apiurl}/api/ad-listings`, {

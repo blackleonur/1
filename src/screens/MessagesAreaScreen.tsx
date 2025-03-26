@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   FlatList,
   Image,
   SafeAreaView,
+  ActivityIndicator,
 } from "react-native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../Types";
@@ -17,6 +18,7 @@ import {
   faEllipsisV,
 } from "@fortawesome/free-solid-svg-icons";
 import apiurl from "../Apiurl";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type MessagesAreaScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -40,75 +42,92 @@ type Message = {
 };
 
 const MessagesAreaScreen: React.FC<Props> = ({ navigation }) => {
-  // Örnek mesaj verileri
-  const messages: Message[] = [
-    {
-      id: "1",
-      sender: {
-        id: "101",
-        name: "Ayşe Demir",
-        avatar: "https://randomuser.me/api/portraits/women/12.jpg",
-      },
-      lastMessage: "Ürün hala satılık mı?",
-      time: "10:30",
-      unread: true,
-    },
-    {
-      id: "2",
-      sender: {
-        id: "102",
-        name: "Mehmet Yılmaz",
-        avatar: "https://randomuser.me/api/portraits/men/22.jpg",
-      },
-      lastMessage: "Fiyatta pazarlık payı var mı?",
-      time: "Dün",
-      unread: false,
-    },
-    {
-      id: "3",
-      sender: {
-        id: "103",
-        name: "Zeynep Kaya",
-        avatar: "https://randomuser.me/api/portraits/women/33.jpg",
-      },
-      lastMessage: "Teşekkür ederim, görüşmek üzere!",
-      time: "Dün",
-      unread: false,
-    },
-    {
-      id: "4",
-      sender: {
-        id: "104",
-        name: "Ali Öztürk",
-        avatar: "https://randomuser.me/api/portraits/men/44.jpg",
-      },
-      lastMessage: "Ürünü yarın teslim alabilir miyim?",
-      time: "Pazartesi",
-      unread: true,
-    },
-    {
-      id: "5",
-      sender: {
-        id: "105",
-        name: "Selin Aydın",
-        avatar: "https://randomuser.me/api/portraits/women/55.jpg",
-      },
-      lastMessage: "Anlaştık o zaman, yarın görüşürüz.",
-      time: "Pazartesi",
-      unread: false,
-    },
-    {
-      id: "6",
-      sender: {
-        id: "106",
-        name: "Burak Şahin",
-        avatar: "https://randomuser.me/api/portraits/men/66.jpg",
-      },
-      lastMessage: "Ürünün durumu nasıl?",
-      time: "Geçen hafta",
-      unread: false,
-    },
-  ];
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchMessages();
+  }, []);
+
+  const fetchMessages = async () => {
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      const response = await fetch(`${apiurl}/api/messages/conversations`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error("Mesajlar yüklenirken bir hata oluştu");
+      }
+
+      const conversations = data.$values || [];
+      
+      // Mesajları kullanıcılara göre grupla ve son mesajı al
+      const lastMessagesByUser = new Map();
+      
+      conversations.forEach((item: any) => {
+        const otherUserId = item.senderId;
+        const currentMessage = {
+          timestamp: new Date(item.timestamp),
+          message: item
+        };
+        
+        if (!lastMessagesByUser.has(otherUserId) || 
+            new Date(lastMessagesByUser.get(otherUserId).timestamp) < currentMessage.timestamp) {
+          lastMessagesByUser.set(otherUserId, currentMessage);
+        }
+      });
+
+      const formattedMessages: Message[] = Array.from(lastMessagesByUser.values()).map(({message}) => ({
+        id: message.id?.toString(),
+        sender: {
+          id: message.senderId,
+          name: "Kullanıcı " + message.senderId.substring(0, 5),
+          avatar: `https://ui-avatars.com/api/?name=${message.senderId.substring(0, 2)}&background=random`,
+        },
+        lastMessage: message.content || "Mesaj yok",
+        time: formatMessageTime(message.timestamp),
+        unread: false,
+      }));
+
+      // Mesajları tarihe göre sırala (en yeni en üstte)
+      formattedMessages.sort((a, b) => {
+        const dateA = new Date(a.time);
+        const dateB = new Date(b.time);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      console.log("Son mesajlar:", formattedMessages);
+      setMessages(formattedMessages);
+    } catch (error) {
+      console.error("Mesajlar yüklenirken hata detayı:", error);
+      setMessages([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatMessageTime = (timestamp: string) => {
+    const messageDate = new Date(timestamp);
+    const now = new Date();
+    const diffInDays = Math.floor((now.getTime() - messageDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffInDays === 0) {
+      return messageDate.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+    } else if (diffInDays === 1) {
+      return "Dün";
+    } else if (diffInDays < 7) {
+      return messageDate.toLocaleDateString("tr-TR", { weekday: "long" });
+    } else {
+      return messageDate.toLocaleDateString("tr-TR", { day: "numeric", month: "numeric" });
+    }
+  };
 
   const renderItem = ({ item }: { item: Message }) => (
     <TouchableOpacity
@@ -159,12 +178,20 @@ const MessagesAreaScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       </View>
 
-      <FlatList
-        data={messages}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.messagesList}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#8adbd2" />
+        </View>
+      ) : (
+        <FlatList
+          data={messages}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.messagesList}
+          refreshing={loading}
+          onRefresh={fetchMessages}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -256,6 +283,11 @@ const styles = StyleSheet.create({
   unreadMessage: {
     fontWeight: "bold",
     color: "#333",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 
