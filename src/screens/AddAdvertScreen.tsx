@@ -15,7 +15,7 @@ import {
   Platform,
 } from "react-native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { RootStackParamList } from "../Types";
+import { RootStackParamList } from "../types/navigation";
 import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
 import {
   faArrowLeft,
@@ -35,11 +35,12 @@ import TokenService from "../services/TokenService";
 
 type AddAdvertScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
-  "AddAdvert"
+  "AddAdvert" | "Home"
 >;
 
 type Props = {
   navigation: AddAdvertScreenNavigationProp;
+  route: { params: { adId?: string } };
 };
 
 // Kategori tipleri
@@ -50,7 +51,7 @@ type Category = {
   icon?: string;
 };
 
-const AddAdvertScreen: React.FC<Props> = ({ navigation }): JSX.Element => {
+const AddAdvertScreen: React.FC<Props> = ({ navigation, route }): JSX.Element => {
   // State'ler
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");

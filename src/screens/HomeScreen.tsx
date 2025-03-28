@@ -10,9 +10,12 @@ import {
   SafeAreaView,
   TextInput,
   Modal,
+  ViewStyle,
+  TextStyle,
+  ImageStyle,
 } from "react-native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { RootStackParamList } from "../Types";
+import { RootStackParamList } from "../types/navigation";
 import apiurl from "../Apiurl";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -45,9 +48,11 @@ import {
   faImage,
   faChevronUp,
   faChevronDown,
+  faFilter,
+  faStar, // Öne çıkanlar için yıldız ikonu ekleyelim
 } from "@fortawesome/free-solid-svg-icons";
 
-type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
+type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 type Props = {
   navigation: HomeScreenNavigationProp;
@@ -71,8 +76,17 @@ type Advert = {
   location: string;
   imageUrl: string;
   images: { 
-    $values: Array<{ url: string }> // imageUrl yerine url
+    $values: Array<{ url: string }> 
   };
+  // Filtreleme için gerekli yeni alanlar
+  categoryId: number;
+  km?: number;
+  modelYear?: number;
+  enginePower?: string;
+  engineSize?: string;
+  bodyType?: string;
+  transmission?: string;
+  fuelType?: string;
 };
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
@@ -91,7 +105,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedLocation, setSelectedLocation] = useState<string>("");
 
   const [categories, setCategories] = useState<Category[]>([]);
-  const [vehicleCategories, setVehicleCategories] = useState<Category[]>([]);
 
   // Yenileme durumu için yeni state
   const [refreshing, setRefreshing] = useState(false);
@@ -205,6 +218,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     "601 hp ve üzeri"
   ];
 
+  // Yeni state ekleyelim
+  const [showCategories, setShowCategories] = useState(false);
+
   // İlanları getiren fonksiyon
   const fetchAdverts = async (filters?: {
     keyword?: string;
@@ -220,6 +236,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     bodyType?: string;
     transmission?: string;
     fuelType?: string;
+    location?: string;
   }) => {
     try {
       const token = await AsyncStorage.getItem("userToken");
@@ -230,24 +247,22 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       // Query parametrelerini oluştur
       const queryParams = new URLSearchParams();
-      if (filters?.keyword) queryParams.append('keyword', filters.keyword);
-      if (filters?.categoryId) queryParams.append('categoryId', filters.categoryId.toString());
-      if (filters?.minPrice) queryParams.append('minPrice', filters.minPrice.toString());
-      if (filters?.maxPrice) queryParams.append('maxPrice', filters.maxPrice.toString());
-      if (filters?.minKm) queryParams.append('minKm', filters.minKm.toString());
-      if (filters?.maxKm) queryParams.append('maxKm', filters.maxKm.toString());
-      if (filters?.minModelYear) queryParams.append('minModelYear', filters.minModelYear.toString());
-      if (filters?.maxModelYear) queryParams.append('maxModelYear', filters.maxModelYear.toString());
-      if (filters?.enginePowers?.length) queryParams.append('enginePowers', filters.enginePowers.join(','));
-      if (filters?.engineSizes?.length) queryParams.append('engineSizes', filters.engineSizes.join(','));
-      if (filters?.bodyType) queryParams.append('bodyType', filters.bodyType);
-      if (filters?.transmission) queryParams.append('transmission', filters.transmission);
-      if (filters?.fuelType) queryParams.append('fuelType', filters.fuelType);
+      
+      // Tüm filtreleri query parametrelerine ekle
+      Object.entries(filters || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== '') {
+          if (Array.isArray(value)) {
+            queryParams.append(key, value.join(','));
+          } else {
+            queryParams.append(key, value.toString());
+          }
+        }
+      });
 
       const queryString = queryParams.toString();
       const url = `${apiurl}/api/ad-listings/search${queryString ? `?${queryString}` : ''}`;
 
-      console.log('API Request URL:', url); // Debug için URL'i logla
+      console.log('API Request URL:', url);
 
       const response = await fetch(url, {
         method: "GET",
@@ -262,15 +277,29 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       }
 
       const data = await response.json();
-      console.log('API Response:', data); // Debug için response'u logla
 
       if (data && Array.isArray(data.$values)) {
         const processedAdverts = data.$values.map((advert: any) => ({
           ...advert,
           images: advert.images || { $values: [] }
         }));
+        
+        // İşlenmiş ilanlardaki duplikasyonları kontrol et
+        const uniqueIds = new Set();
+        const duplicates = processedAdverts.filter((ad: Advert) => {
+          if (uniqueIds.has(ad.id)) {
+            console.log('Duplike İlan:', ad.id, ad.title);
+            return true;
+          }
+          uniqueIds.add(ad.id);
+          return false;
+        });
+        
+        if (duplicates.length > 0) {
+          console.log('Duplike İlanlar Bulundu:', duplicates.length);
+        }
+
         setAllAdverts(processedAdverts);
-        console.log('Processed Adverts:', processedAdverts); // Debug için işlenmiş ilanları logla
       } else {
         console.error("API'den geçersiz veri formatı:", data);
         setAllAdverts([]);
@@ -326,24 +355,20 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     Promise.all([
       fetchCategories(),
       fetchAdverts(),
-      selectedMainCategory === 1 ? fetchVehicleCategories() : Promise.resolve(),
     ]).finally(() => {
       setRefreshing(false);
     });
-  }, [selectedMainCategory]);
+  }, []);
 
   useEffect(() => {
     fetchCategories();
     fetchAdverts();
-    if (selectedMainCategory === 1) {
-      fetchVehicleCategories();
-    }
-  }, [selectedMainCategory]);
+  }, []);
 
   useEffect(() => {
     // Eğer seçili kategori araç kategorisi (id: 1) ise, araç kategorilerini getir
     if (selectedFilterCategories[0] === 1) {
-      fetchVehicleCategories();
+      fetchAdverts({ categoryId: 1 });
     }
   }, [selectedFilterCategories]);
 
@@ -362,71 +387,35 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         return;
       }
 
-      // Ana kategorileri işle
-      const processedCategories = data.$values.map((category: any) => {
-        let icon = "view-grid";
+      // Kategorileri düzleştirmek için yardımcı fonksiyon
+      const flattenCategories = (categories: any[], parentId?: number): Category[] => {
+        return categories.reduce((acc: Category[], category: any) => {
+          // Ana kategoriyi ekle
+          const currentCategory: Category = {
+            id: category.id,
+            name: category.name,
+            icon: getIconForCategory(category.id),
+            parentId: parentId
+          };
 
-        // Ana kategoriler için (id 1-8 arası) özel ikonlar
-        if (category.id >= 1 && category.id <= 8) {
-          switch (category.id) {
-            case 1:
-              icon = "car"; // Vasıta
-              break;
-            case 2:
-              icon = "home"; // Emlak
-              break;
-            case 3:
-              icon = "cellphone"; // Telefon
-              break;
-            case 4:
-              icon = "laptop"; // Elektronik
-              break;
-            case 5:
-              icon = "sofa"; // Ev & Yaşam
-              break;
-            case 6:
-              icon = "tshirt-crew"; // Giyim & Aksesuar
-              break;
-            case 7:
-              icon = "flower"; // Kişisel Bakım
-              break;
-            case 8:
-              icon = "view-grid"; // Diğer
-              break;
+          acc.push(currentCategory);
+
+          // Alt kategorileri varsa onları da ekle
+          if (category.children?.$values?.length > 0) {
+            acc.push(...flattenCategories(category.children.$values, category.id));
           }
-        }
 
-        // Ana kategoriyi ekle
-        const mainCategory = {
-          id: category.id,
-          name: category.name,
-          icon,
-        };
+          return acc;
+        }, []);
+      };
 
-        // Alt kategorileri işle (eğer varsa)
-        const subCategories = category.children?.$values
-          ? category.children.$values.map((child: any) => ({
-              id: child.id,
-              name: child.name,
-              parentId: category.id,
-              icon: "view-grid", // Alt kategoriler için varsayılan icon
-            }))
-          : [];
+      // Ana kategorileri ve alt kategorileri düzleştir
+      const flattenedCategories = flattenCategories(data.$values);
+      setCategories(flattenedCategories);
 
-        // Ana kategori ve alt kategorileri birleştir
-        return [mainCategory, ...subCategories];
-      });
-
-      // Tüm kategorileri düzleştir ve tekrar eden kategorileri filtrele
-      const flattenedCategories = processedCategories.flat();
-      const uniqueCategories = flattenedCategories.filter(
-        (category: Category, index: number, self: Category[]) =>
-          index === self.findIndex((c: Category) => c.id === category.id)
-      );
-
-      setCategories(uniqueCategories);
     } catch (error) {
       console.error("Kategoriler yüklenirken hata oluştu:", error);
+      // Hata durumunda varsayılan kategorileri ayarla
       setCategories([
         { id: 1, name: "Vasıta", icon: "car" },
         { id: 2, name: "Emlak", icon: "home" },
@@ -440,123 +429,47 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const fetchVehicleCategories = async () => {
-    try {
-      const response = await fetch(`${apiurl}/api/vehicle-categories`);
+  // Kategori ID'sine göre icon belirleme yardımcı fonksiyonu
+  const getIconForCategory = (id: number): string => {
+    const mainCategoryIcons: { [key: number]: string } = {
+      1: "car",
+      2: "home",
+      3: "cellphone",
+      4: "laptop",
+      5: "sofa",
+      6: "tshirt-crew",
+      7: "flower",
+      8: "view-grid",
+    };
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      // Tüm alt kategorileri düz bir diziye çeviren yardımcı fonksiyon
-      const flattenCategories = (
-        category: any,
-        parentId?: number
-      ): Category[] => {
-        if (!category || !category.id) return [];
-
-        const current: Category = {
-          id: category.id,
-          name: category.name,
-          icon: category.children?.$values?.length ? "car" : "view-grid",
-          parentId: parentId,
-        };
-
-        if (!category.children?.$values?.length) {
-          return [current];
-        }
-
-        const children = category.children.$values
-          .map((child: any) => flattenCategories(child, category.id))
-          .flat();
-
-        return [current, ...children];
-      };
-
-      const allCategories = flattenCategories(data);
-      setVehicleCategories(allCategories);
-    } catch (error) {
-      console.error("Araç kategorileri yüklenirken hata oluştu:", error);
-    }
+    return mainCategoryIcons[id] || "view-grid";
   };
 
   // Görüntülenecek kategorileri belirle
   const displayedCategories = useMemo(() => {
-    const validCategories = (cats: Category[]) =>
-      cats.filter(
-        (cat): cat is Category => typeof cat?.id === "number" && !isNaN(cat.id)
-      );
-
     if (selectedMainCategory === "all") {
-      return validCategories(categories.filter((cat) => !cat.parentId));
-    } else if (selectedMainCategory === 1) {
-      // Seçili kategori varsa
-      if (selectedCategory !== "all" && selectedCategory !== 1) {
-        const hasChildren = vehicleCategories.some(
-          (cat) => cat.parentId === selectedCategory
-        );
-
-        if (hasChildren) {
-          // Alt kategorileri varsa onları göster
-          return validCategories(
-            vehicleCategories.filter((cat) => cat.parentId === selectedCategory)
-          );
-        } else {
-          // Alt kategorisi yoksa sadece seçili kategoriyi göster
-          return validCategories(
-            vehicleCategories.filter((cat) => cat.id === selectedCategory)
-          );
-        }
-      }
-      // Ana vasıta kategorisindeyse, ilk seviye alt kategorileri göster
-      return validCategories(
-        vehicleCategories.filter((cat) => cat.parentId === 1)
-      );
-    } else {
-      // Diğer kategoriler için
-      const hasChildren = categories.some(
-        (cat) => cat.parentId === selectedMainCategory
-      );
-
-      if (hasChildren) {
-        return validCategories(
-          categories.filter((cat) => cat.parentId === selectedMainCategory)
-        );
-      } else {
-        return validCategories(
-          categories.filter((cat) => cat.id === selectedMainCategory)
-        );
-      }
+      return categories.filter(cat => !cat.parentId);
     }
-  }, [selectedMainCategory, selectedCategory, categories, vehicleCategories]);
+
+    return categories.filter(cat => cat.parentId === selectedCategory);
+  }, [selectedMainCategory, selectedCategory, categories]);
 
   // Geri butonu için fonksiyonu güncelle
   const handleBackButton = async () => {
     try {
       if (selectedCategory !== "all") {
-        // Alt kategoriden bir üst kategoriye dön
-        const parentCategory = vehicleCategories.find(
-          (cat) => cat.id === selectedCategory
-        )?.parentId;
-        
-        if (parentCategory) {
-          setSelectedCategory(parentCategory);
-          // Üst kategorinin ilanlarını getir
-          await fetchCategoryAdverts(parentCategory);
+        const currentCategory = categories.find(cat => cat.id === selectedCategory);
+        if (currentCategory?.parentId) {
+          setSelectedCategory(currentCategory.parentId);
+          await fetchCategoryAdverts(currentCategory.parentId);
         } else {
           setSelectedCategory("all");
-          // Ana kategorinin ilanlarını getir
-          if (selectedMainCategory !== "all") {
-            await fetchCategoryAdverts(selectedMainCategory);
-          }
+          setSelectedMainCategory("all");
+          await fetchAdverts();
         }
       } else {
-        // Ana kategorilere dön
         setSelectedMainCategory("all");
         setSelectedCategory("all");
-        // Tüm ilanları getir
         await fetchAdverts();
       }
     } catch (error) {
@@ -567,27 +480,20 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   // handleCategorySelect fonksiyonunu da düzenleyelim
   const handleCategorySelect = async (categoryId: number) => {
     try {
-      if (selectedMainCategory === 1) {
-        // Vasıta kategorisi içindeyiz
-        const hasChildren = vehicleCategories.some(
-          (cat) => cat.parentId === categoryId
-        );
+      const selectedCat = categories.find(cat => cat.id === categoryId);
+      const hasChildren = categories.some(cat => cat.parentId === categoryId);
+
+      if (!selectedCat?.parentId) {
+        // Ana kategori seçildi
+        setSelectedMainCategory(categoryId);
         setSelectedCategory(categoryId);
-        // Her durumda API'ye istek at
-        await fetchCategoryAdverts(categoryId);
       } else {
-        const category = categories.find((cat) => cat.id === categoryId);
-        if (category?.parentId) {
-          // Alt kategori seçildi
-          setSelectedCategory(categoryId);
-        } else {
-          // Ana kategori seçildi
-          setSelectedMainCategory(categoryId);
-          setSelectedCategory("all");
-        }
-        // Her durumda API'ye istek at
-        await fetchCategoryAdverts(categoryId);
+        // Alt kategori seçildi
+        setSelectedCategory(categoryId);
       }
+
+      // Her durumda API'ye istek at
+      await fetchCategoryAdverts(categoryId);
     } catch (error) {
       console.error("Kategori ilanları yüklenirken hata oluştu:", error);
       setAllAdverts([]);
@@ -625,27 +531,30 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       const advertsResponses = await Promise.all(advertPromises);
       
-      // Gelen veriyi kontrol et
-      console.log('Category Adverts Response:', JSON.stringify(advertsResponses[0], null, 2));
+      // Benzersiz ilanları tutmak için bir Map kullanalım
+      const uniqueAdverts = new Map();
       
       // Tüm ilanları birleştir ve işle
-      const allAdverts = advertsResponses.flatMap(response => {
+      advertsResponses.forEach(response => {
         if (response && Array.isArray(response.$values)) {
-          return response.$values.map((advert: any) => ({
-            ...advert,
-            id: advert.id,
-            title: advert.title,
-            price: advert.price,
-            description: advert.description,
-            images: {
-              $values: advert.images?.$values || [{ url: advert.imageUrl }]
+          response.$values.forEach((advert: any) => {
+            // Her ilanı sadece bir kez ekle
+            if (!uniqueAdverts.has(advert.id)) {
+              uniqueAdverts.set(advert.id, {
+                ...advert,
+                images: {
+                  $values: advert.images?.$values || [{ url: advert.imageUrl }]
+                }
+              });
             }
-          }));
+          });
         }
-        return [];
       });
 
+      // Map'ten Array'e çevir
+      const allAdverts = Array.from(uniqueAdverts.values());
       setAllAdverts(allAdverts);
+
     } catch (error) {
       console.error("Kategori ilanları yüklenirken hata oluştu:", error);
       setAllAdverts([]);
@@ -656,52 +565,118 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const filteredAdverts = useMemo(() => {
     let filtered = allAdverts;
 
-    // Sadece arama filtresi uygula, kategori filtresi API'den geliyor
-    if (searchQuery.trim() !== "") {
+    // Arama filtresi
+    if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter((advert) => {
-        // Null check ekleyelim
+      filtered = filtered.filter(advert => {
         const title = advert.title?.toLowerCase() || '';
         const description = advert.description?.toLowerCase() || '';
         const location = advert.location?.toLowerCase() || '';
-
-        return (
-          title.includes(query) ||
-          description.includes(query) ||
-          location.includes(query)
-        );
+        return title.includes(query) || description.includes(query) || location.includes(query);
       });
     }
 
+    // Kategori filtresi
+    if (selectedFilterCategories.length > 0) {
+      const lastSelectedCategory = selectedFilterCategories[selectedFilterCategories.length - 1];
+      filtered = filtered.filter(advert => advert.categoryId === lastSelectedCategory);
+    }
+
+    // Fiyat aralığı filtresi
+    if (priceRange.min || priceRange.max) {
+      filtered = filtered.filter(advert => {
+        const price = advert.price;
+        const minPrice = priceRange.min ? parseFloat(priceRange.min) : 0;
+        const maxPrice = priceRange.max ? parseFloat(priceRange.max) : Infinity;
+        return price >= minPrice && price <= maxPrice;
+      });
+    }
+
+    // Araç kategorisi için özel filtreler
+    if (selectedFilterCategories[0] === 1) {
+      // Kilometre filtresi
+      if (kmRange.min || kmRange.max) {
+        filtered = filtered.filter(advert => {
+          const km = advert.km || 0;
+          const minKm = kmRange.min ? parseInt(kmRange.min) : 0;
+          const maxKm = kmRange.max ? parseInt(kmRange.max) : Infinity;
+          return km >= minKm && km <= maxKm;
+        });
+      }
+
+      // Model yılı filtresi
+      if (modelRange.min || modelRange.max) {
+        filtered = filtered.filter(advert => {
+          const modelYear = advert.modelYear || 0;
+          const minYear = modelRange.min ? parseInt(modelRange.min) : 0;
+          const maxYear = modelRange.max ? parseInt(modelRange.max) : Infinity;
+          return modelYear >= minYear && modelYear <= maxYear;
+        });
+      }
+
+      // Motor gücü filtresi
+      if (enginePower.length > 0) {
+        filtered = filtered.filter(advert => 
+          enginePower.includes(advert.enginePower)
+        );
+      }
+
+      // Motor hacmi filtresi
+      if (engineSize.length > 0) {
+        filtered = filtered.filter(advert => 
+          engineSize.includes(advert.engineSize)
+        );
+      }
+
+      // Kasa tipi filtresi
+      if (bodyType) {
+        filtered = filtered.filter(advert => 
+          advert.bodyType === bodyType
+        );
+      }
+
+      // Vites tipi filtresi
+      if (transmission) {
+        filtered = filtered.filter(advert => 
+          advert.transmission === transmission
+        );
+      }
+
+      // Yakıt tipi filtresi
+      if (fuelType) {
+        filtered = filtered.filter(advert => 
+          advert.fuelType === fuelType
+        );
+      }
+    }
+
+    // Konum filtresi
+    if (selectedLocation) {
+      filtered = filtered.filter(advert => 
+        advert.location?.toLowerCase().includes(selectedLocation.toLowerCase())
+      );
+    }
+
     return filtered;
-  }, [allAdverts, searchQuery]);
+  }, [
+    allAdverts,
+    searchQuery,
+    selectedFilterCategories,
+    priceRange,
+    kmRange,
+    modelRange,
+    enginePower,
+    engineSize,
+    bodyType,
+    transmission,
+    fuelType,
+    selectedLocation
+  ]);
 
   // Filtreleri uygula
-  const applyFilters = async () => {
-    try {
-      const filters = {
-        keyword: searchQuery,
-        categoryId: selectedFilterCategories.length > 0 ? 
-          selectedFilterCategories[selectedFilterCategories.length - 1] : undefined,
-        minPrice: priceRange.min ? parseFloat(priceRange.min) : undefined,
-        maxPrice: priceRange.max ? parseFloat(priceRange.max) : undefined,
-        minKm: kmRange.min ? parseInt(kmRange.min) : undefined,
-        maxKm: kmRange.max ? parseInt(kmRange.max) : undefined,
-        minModelYear: modelRange.min ? parseInt(modelRange.min) : undefined,
-        maxModelYear: modelRange.max ? parseInt(modelRange.max) : undefined,
-        enginePowers: enginePower.length > 0 ? enginePower : undefined,
-        engineSizes: engineSize.length > 0 ? engineSize : undefined,
-        bodyType: bodyType || undefined,
-        transmission: transmission || undefined,
-        fuelType: fuelType || undefined,
-      };
-
-      console.log('Applying filters:', filters); // Debug için filtreleri logla
-      await fetchAdverts(filters);
-      setShowFilterModal(false);
-    } catch (error) {
-      console.error("Filtreler uygulanırken hata oluştu:", error);
-    }
+  const applyFilters = () => {
+    // Sadece modalı kapat, filtreleme işlemi useMemo ile otomatik yapılacak
+    setShowFilterModal(false);
   };
 
   // searchQuery değiştiğinde filtrelemeyi uygula
@@ -732,7 +707,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const renderItem = ({ item }: { item: Advert }) => {
-    // url'i kullan
     const imageUrl = item.images?.$values?.[0]?.url;
 
     return (
@@ -812,7 +786,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       return selectedFilterCategories.map((categoryId, index) => {
         const categoryList = categoryId === 1 || selectedFilterCategories[0] === 1 
-          ? vehicleCategories 
+          ? categories 
           : categories;
         const category = categoryList.find(cat => cat.id === categoryId);
         return category?.name || "";
@@ -822,15 +796,13 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     // Alt kategorileri getiren yardımcı fonksiyon
     const getSubCategories = () => {
       const currentParentId = selectedFilterCategories[selectedFilterCategories.length - 1];
-      const isVehicleCategory = selectedFilterCategories[0] === 1;
-      const categoryList = isVehicleCategory ? vehicleCategories : categories;
+      const categoryList = categories;
 
       // Seçili kategorinin alt kategorilerini filtrele
       const subCategories = categoryList.filter(cat => cat.parentId === currentParentId);
       
       // Debug için log ekleyelim
       console.log('Current Parent ID:', currentParentId);
-      console.log('Is Vehicle Category:', isVehicleCategory);
       console.log('Category List:', categoryList);
       console.log('Sub Categories:', subCategories);
       
@@ -839,8 +811,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
     // Alt kategori kontrolü için yardımcı fonksiyon
     const hasSubCategories = (categoryId: number) => {
-      const isVehicleCategory = selectedFilterCategories[0] === 1;
-      const categoryList = isVehicleCategory ? vehicleCategories : categories;
+      const categoryList = categories;
       return categoryList.some(cat => cat.parentId === categoryId);
     };
 
@@ -892,7 +863,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                         .filter(cat => !cat.parentId)
                         .map((category) => (
                           <TouchableOpacity
-                            key={category.id}
+                            key={`category-${category.id}`}
                             style={[
                               styles.categoryFilterButton,
                               selectedFilterCategories[0] === category.id && 
@@ -902,11 +873,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                               setSelectedFilterCategories([category.id]);
                               if (category.id === 1) {
                                 // Vasıta kategorisi seçildiğinde hemen fetchVehicleCategories'i çağır
-                                fetchVehicleCategories().then(() => {
-                                  if (hasSubCategories(category.id)) {
-                                    setCurrentFilterLevel(1);
-                                  }
-                                });
+                                fetchAdverts({ categoryId: 1 });
                               } else if (hasSubCategories(category.id)) {
                                 setCurrentFilterLevel(1);
                               }
@@ -940,7 +907,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                       <View style={styles.categoriesGrid}>
                         {getSubCategories().map((category) => (
                           <TouchableOpacity
-                            key={category.id}
+                            key={`subcategory-${category.id}`}
                             style={[
                               styles.categoryFilterButton,
                               selectedFilterCategories.includes(category.id) && 
@@ -1080,7 +1047,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                       >
                         {ENGINE_POWERS.map((power) => (
                           <TouchableOpacity
-                            key={power}
+                            key={`power-${power}`}
                             style={[
                               styles.engineSizeButton,
                               enginePower.includes(power) && styles.selectedOptionButton,
@@ -1141,7 +1108,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                       >
                         {ENGINE_SIZES.map((size) => (
                           <TouchableOpacity
-                            key={size}
+                            key={`size-${size}`}
                             style={[
                               styles.engineSizeButton,
                               engineSize.includes(size) && styles.selectedOptionButton,
@@ -1176,7 +1143,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                     <View style={styles.optionsContainer}>
                       {BODY_TYPES.map((type) => (
                         <TouchableOpacity
-                          key={type}
+                          key={`type-${type}`}
                           style={[
                             styles.optionButton,
                             bodyType === type && styles.selectedOptionButton,
@@ -1202,7 +1169,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                     <View style={styles.optionsContainer}>
                       {TRANSMISSION_TYPES.map((type) => (
                         <TouchableOpacity
-                          key={type}
+                          key={`transmission-${type}`}
                           style={[
                             styles.optionButton,
                             transmission === type && styles.selectedOptionButton,
@@ -1228,7 +1195,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                     <View style={styles.optionsContainer}>
                       {FUEL_TYPES.map((type) => (
                         <TouchableOpacity
-                          key={type}
+                          key={`fuel-${type}`}
                           style={[
                             styles.optionButton,
                             fuelType === type && styles.selectedOptionButton,
@@ -1296,74 +1263,93 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             onChangeText={setSearchQuery}
           />
         </View>
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setShowFilterModal(true)}
-        >
-          <Text style={styles.filterIcon}>⚙️</Text>
-        </TouchableOpacity>
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => setShowCategories(!showCategories)}
+          >
+            <FontAwesomeIcon icon={faThLarge} size={18} color="#8adbd2" />
+            <Text style={styles.actionButtonText}>Kategoriler</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => {/* Öne çıkanları getir */}}
+          >
+            <FontAwesomeIcon icon={faStar} size={18} color="#8adbd2" />
+            <Text style={styles.actionButtonText}>Öne Çıkanlar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => setShowFilterModal(true)}
+          >
+            <FontAwesomeIcon icon={faFilter} size={18} color="#8adbd2" />
+            <Text style={styles.actionButtonText}>Filtrele</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Kategoriler */}
-      <View style={styles.categoriesContainer}>
-        {(selectedMainCategory !== "all" || selectedCategory !== "all") && (
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={handleBackButton}
-          >
-            <FontAwesomeIcon icon={faArrowLeft} size={16} color="#8adbd2" />
-            <Text style={styles.backButtonText}>
-              {selectedCategory !== "all" ? "Geri" : "Ana Kategoriler"}
-            </Text>
-          </TouchableOpacity>
-        )}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesScrollView}
-        >
-          {displayedCategories.map((category) => (
+      {/* Kategoriler - showCategories true ise göster */}
+      {showCategories && (
+        <View style={styles.categoriesContainer}>
+          {(selectedMainCategory !== "all" || selectedCategory !== "all") && (
             <TouchableOpacity
-              key={`category-${category.id}`}
-              style={[
-                styles.categoryItem,
-                selectedCategory === category.id && styles.selectedCategoryItem,
-              ]}
-              onPress={() => handleCategorySelect(category.id)}
+              style={styles.backButton}
+              onPress={handleBackButton}
             >
-              <View
-                style={[
-                  styles.categoryIconContainer,
-                  selectedCategory === category.id &&
-                    styles.selectedCategoryIconContainer,
-                ]}
-              >
-                <IconView
-                  name={category.icon}
-                  size={24}
-                  color={selectedCategory === category.id ? "#fff" : "#8adbd2"}
-                />
-              </View>
-              <Text
-                style={[
-                  styles.categoryName,
-                  selectedCategory === category.id &&
-                    styles.selectedCategoryName,
-                ]}
-              >
-                {category.name}
+              <FontAwesomeIcon icon={faArrowLeft} size={16} color="#8adbd2" />
+              <Text style={styles.backButtonText}>
+                {selectedCategory !== "all" ? "Geri" : "Ana Kategoriler"}
               </Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
+          )}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesScrollView}
+          >
+            {displayedCategories.map((category) => (
+              <TouchableOpacity
+                key={`category-${category.id}`}
+                style={[
+                  styles.categoryItem,
+                  selectedCategory === category.id && styles.selectedCategoryItem,
+                ]}
+                onPress={() => handleCategorySelect(category.id)}
+              >
+                <View
+                  style={[
+                    styles.categoryIconContainer,
+                    selectedCategory === category.id &&
+                      styles.selectedCategoryIconContainer,
+                  ]}
+                >
+                  <IconView
+                    name={category.icon}
+                    size={24}
+                    color={selectedCategory === category.id ? "#fff" : "#8adbd2"}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.categoryName,
+                    selectedCategory === category.id &&
+                      styles.selectedCategoryName,
+                  ]}
+                >
+                  {category.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {/* Ana içerik alanı */}
       <View style={styles.mainContent}>
         <FlatList
           data={filteredAdverts}
           renderItem={renderItem}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => `advert-${item.id}-${index}`}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
           refreshing={refreshing}
@@ -1434,45 +1420,65 @@ const styles = StyleSheet.create({
   },
   categoriesContainer: {
     backgroundColor: "#fff",
-    paddingVertical: 10,
+    paddingVertical: 15,
     marginBottom: 10,
-    borderRadius: 15,
-    marginHorizontal: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-  },
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  } as ViewStyle,
   categoriesScrollView: {
-    paddingHorizontal: 10,
-    paddingBottom: 5,
-  },
+    paddingHorizontal: 15,
+  } as ViewStyle,
   categoryItem: {
     alignItems: "center",
-    marginHorizontal: 10,
-    width: 70,
-  },
+    marginRight: 20,
+    width: 80,
+  } as ViewStyle,
   categoryIconContainer: {
-    width: 55,
-    height: 55,
-    borderRadius: 27.5,
+    width: 65,
+    height: 65,
+    borderRadius: 20, // Daha modern köşeler
     backgroundColor: "#f0f7ff",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 10,
     shadowColor: "#8adbd2",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  } as ViewStyle,
   categoryName: {
-    fontSize: 10,
+    fontSize: 12,
     textAlign: "center",
     color: "#333",
     fontWeight: "500",
-  },
+    marginTop: 4,
+  } as TextStyle,
+  selectedCategoryItem: {
+    transform: [{ scale: 1.05 }], // Seçili kategoriyi biraz büyüt
+  } as ViewStyle,
+  selectedCategoryIconContainer: {
+    backgroundColor: "#8adbd2",
+    shadowColor: "#8adbd2",
+    shadowOpacity: 0.25,
+  } as ViewStyle,
+  selectedCategoryName: {
+    color: "#8adbd2",
+    fontWeight: "600",
+  } as TextStyle,
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    marginBottom: 10,
+  } as ViewStyle,
+  backButtonText: {
+    marginLeft: 8,
+    color: "#8adbd2",
+    fontSize: 14,
+    fontWeight: "600",
+  } as TextStyle,
   listContainer: {
     flexGrow: 1,
     paddingHorizontal: 15,
@@ -1555,13 +1561,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
   },
   actionButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "#f0f7ff",
-    justifyContent: "center",
+    flex: 1,
+    flexDirection: "column",
     alignItems: "center",
-    marginLeft: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    marginHorizontal: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   actionIcon: {
     fontSize: 16,
@@ -1610,14 +1622,15 @@ const styles = StyleSheet.create({
   },
   // Arama ve Filtreleme Stilleri
   searchContainer: {
-    flexDirection: "row",
-    paddingHorizontal: 10,
+    flexDirection: "column",
+    paddingHorizontal: 15,
     paddingVertical: 10,
     backgroundColor: "#fff",
-    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+    gap: 10,
   },
   searchInputContainer: {
-    flex: 1,
     flexDirection: "row",
     backgroundColor: "#f5f5f5",
     borderRadius: 8,
@@ -1625,14 +1638,29 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     alignItems: "center",
   },
-  searchIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
   searchInput: {
     flex: 1,
     fontSize: 14,
     color: "#333",
+    marginLeft: 8,
+  },
+  searchIcon: {
+    fontSize: 16,
+    color: "#666",
+  },
+  actionButtonsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#f5f5f5",
+    borderRadius: 12,
+    padding: 8,
+  },
+  actionButtonText: {
+    fontSize: 12,
+    color: "#333",
+    marginTop: 4,
+    fontWeight: "500",
   },
   filterButton: {
     marginLeft: 10,
@@ -1779,112 +1807,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 16,
   },
-  backButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    marginBottom: 5,
-  },
-  backButtonText: {
-    marginLeft: 8,
-    color: "#8adbd2",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  selectedCategoryItem: {
-    // Seçili kategori için stil
-  },
-  selectedCategoryIconContainer: {
-    backgroundColor: "#8adbd2",
-  },
-  selectedCategoryName: {
-    color: "#8adbd2",
-    fontWeight: "bold",
-  },
-  bottomNav: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#eee",
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  bottomNavItem: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  bottomNavText: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 4,
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 50,
-    paddingHorizontal: 20,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 15,
-    lineHeight: 24,
-  },
-  mainContent: {
-    flex: 1,
-    marginBottom: 60,
-  },
-  categoriesFilterContainer: {
-    marginTop: 10,
-  },
-  categoriesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -5,
-  },
-  categoryFilterButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    margin: 5,
-    minWidth: '30%',
-  },
-  selectedCategoryFilterButton: {
-    backgroundColor: '#8adbd2',
-    borderColor: '#8adbd2',
-  },
-  categoryFilterText: {
-    fontSize: 14,
-    color: '#333',
-    textAlign: 'center',
-  },
-  selectedCategoryFilterText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  backFilterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    marginBottom: 10,
-  },
-  backFilterText: {
-    marginLeft: 8,
-    color: '#8adbd2',
-    fontSize: 14,
-    fontWeight: '500',
-  },
   selectedCategoryPath: {
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
@@ -1989,6 +1911,90 @@ const styles = StyleSheet.create({
 
   placeholderText: {
     color: '#999',
+  },
+
+  bottomNav: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  bottomNavItem: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bottomNavText: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 4,
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 50,
+    paddingHorizontal: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 15,
+    lineHeight: 24,
+  },
+  mainContent: {
+    flex: 1,
+    marginBottom: 60,
+  },
+  categoriesFilterContainer: {
+    marginTop: 10,
+  },
+  categoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -5,
+  },
+  categoryFilterButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    margin: 5,
+    minWidth: '30%',
+  },
+  selectedCategoryFilterButton: {
+    backgroundColor: '#8adbd2',
+    borderColor: '#8adbd2',
+  },
+  categoryFilterText: {
+    fontSize: 14,
+    color: '#333',
+    textAlign: 'center',
+  },
+  selectedCategoryFilterText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  backFilterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    marginBottom: 10,
+  },
+  backFilterText: {
+    marginLeft: 8,
+    color: '#8adbd2',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 
