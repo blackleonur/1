@@ -1,6 +1,19 @@
 export type RootStackParamList = {
+  SplashScreen: undefined;
   Home: undefined;
-  Advert: { advertId: string };
+  Advert: { id: string };
+  GuestHomeScreen: undefined;
+  RegisterScreen: undefined;
+  VerificationScreen: { phoneNumber: string };
+  Profile: undefined;
+  MessagesArea: undefined;
+  Messages: { chatId: string };
+  AddAdvert: undefined;
+  PersonalInfo: undefined;
+  Favs: undefined;
+  MyAds: undefined;
+  Privacy: undefined;
+  Help: undefined;
   // ... diğer route'lar
 };
 
@@ -21,4 +34,4 @@ export type Advert = {
   status: string;
   address: string;
   categoryName: string;
-}; 
+};

@@ -13,9 +13,10 @@ import {
   FlatList,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from "react-native";
-import { StackNavigationProp } from "@react-navigation/stack";
-import { RootStackParamList } from "../types/navigation";
+import { StackScreenProps } from "@react-navigation/stack";
+import { RootStackParamList } from "../Types";
 import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
 import {
   faArrowLeft,
@@ -33,15 +34,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import TokenService from "../services/TokenService";
 
-type AddAdvertScreenNavigationProp = StackNavigationProp<
-  RootStackParamList,
-  "AddAdvert" | "Home"
->;
-
-type Props = {
-  navigation: AddAdvertScreenNavigationProp;
-  route: { params: { adId?: string } };
-};
+type Props = StackScreenProps<RootStackParamList, "AddAdvert">;
 
 // Kategori tipleri
 type Category = {
@@ -51,7 +44,7 @@ type Category = {
   icon?: string;
 };
 
-const AddAdvertScreen: React.FC<Props> = ({ navigation, route }): JSX.Element => {
+const AddAdvertScreen: React.FC<Props> = ({ navigation }): JSX.Element => {
   // State'ler
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -79,6 +72,7 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation, route }): JSX.Element =>
     longitude: 0,
   });
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Araç kategorilerini getiren fonksiyon
   const fetchVehicleCategories = async () => {
@@ -728,11 +722,11 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation, route }): JSX.Element =>
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
-      
+
       if (base64.length === 0) {
         throw new Error("Base64 dönüşümü başarısız - boş string");
       }
-      
+
       return base64;
     } catch (error) {
       console.error("Resim base64'e çevrilirken hata:", error);
@@ -742,6 +736,8 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation, route }): JSX.Element =>
 
   // İlan ekleme fonksiyonu
   const addAdvert = async () => {
+    if (isLoading) return; // Eğer yükleme devam ediyorsa fonksiyonu çalıştırma
+
     // Validasyon kontrolleri
     if (selectedCategories.length === 0) {
       Alert.alert("Hata", "Lütfen bir kategori seçin.");
@@ -784,13 +780,18 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation, route }): JSX.Element =>
     }
 
     try {
+      setIsLoading(true); // Loading başlat
+
       const [isValid, token] = await Promise.all([
         TokenService.isTokenValid(),
         TokenService.getToken(),
       ]);
 
       if (!isValid || !token) {
-        Alert.alert("Uyarı", "Oturumunuz sonlanmış. Lütfen tekrar giriş yapın.");
+        Alert.alert(
+          "Uyarı",
+          "Oturumunuz sonlanmış. Lütfen tekrar giriş yapın."
+        );
         return;
       }
 
@@ -802,13 +803,17 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation, route }): JSX.Element =>
           base64Images.push(base64);
         } catch (error) {
           console.error("Resim base64'e çevrilirken hata:", error);
-          Alert.alert("Uyarı", "Bazı resimler yüklenemedi. Lütfen tekrar deneyin.");
+          Alert.alert(
+            "Uyarı",
+            "Bazı resimler yüklenemedi. Lütfen tekrar deneyin."
+          );
           return;
         }
       }
 
       // Son seçili kategori ID'sini al
-      const lastSelectedCategoryId = selectedCategories[selectedCategories.length - 1];
+      const lastSelectedCategoryId =
+        selectedCategories[selectedCategories.length - 1];
 
       // İlan verilerini hazırla
       const advertData = {
@@ -820,13 +825,13 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation, route }): JSX.Element =>
         address: address.trim(),
         latitude: addressDetails.latitude,
         longitude: addressDetails.longitude,
-        base64Images: base64Images
+        base64Images: base64Images,
       };
 
       // İstek verilerini kontrol et
       console.log("Gönderilecek ilan verileri:", {
         ...advertData,
-        base64Images: `${base64Images.length} adet resim`
+        base64Images: `${base64Images.length} adet resim`,
       });
 
       // İlanı ekle
@@ -844,9 +849,11 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation, route }): JSX.Element =>
         console.error("İlan ekleme yanıtı:", {
           status: response.status,
           statusText: response.statusText,
-          body: errorText
+          body: errorText,
         });
-        throw new Error(`İlan ekleme başarısız: ${response.status} ${errorText}`);
+        throw new Error(
+          `İlan ekleme başarısız: ${response.status} ${errorText}`
+        );
       }
 
       const result = await response.json();
@@ -858,13 +865,14 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation, route }): JSX.Element =>
           onPress: () => navigation.navigate("Home"),
         },
       ]);
-
     } catch (error) {
       console.error("İlan eklenirken hata oluştu:", error);
       Alert.alert(
         "Hata",
         "İlan eklenirken bir hata oluştu. Lütfen tekrar deneyin."
       );
+    } finally {
+      setIsLoading(false); // Loading bitir
     }
   };
 
@@ -1014,17 +1022,33 @@ const AddAdvertScreen: React.FC<Props> = ({ navigation, route }): JSX.Element =>
               style={styles.input}
               value={price}
               onChangeText={(text) => {
-                // Sadece sayısal değer girilmesini sağla
                 if (/^\d*$/.test(text)) {
                   setPrice(text);
                 }
               }}
               placeholder="Fiyat girin"
               keyboardType="numeric"
+              editable={!isLoading}
             />
 
-            <TouchableOpacity style={styles.completeButton} onPress={addAdvert}>
-              <Text style={styles.completeButtonText}>İlanı Yayınla</Text>
+            <TouchableOpacity
+              style={[
+                styles.completeButton,
+                isLoading && styles.disabledButton,
+              ]}
+              onPress={addAdvert}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text style={[styles.completeButtonText, styles.loadingText]}>
+                    İlan Yükleniyor...
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.completeButtonText}>İlanı Yayınla</Text>
+              )}
             </TouchableOpacity>
           </View>
         );
@@ -1384,6 +1408,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     marginBottom: 5,
+  },
+  disabledButton: {
+    opacity: 0.7,
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingText: {
+    marginLeft: 10,
   },
 });
 

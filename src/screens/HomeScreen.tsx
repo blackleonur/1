@@ -75,8 +75,8 @@ type Advert = {
   distance: string;
   location: string;
   imageUrl: string;
-  images: { 
-    $values: Array<{ url: string }> 
+  images: {
+    $values: Array<{ url: string }>;
   };
   // Filtreleme için gerekli yeni alanlar
   categoryId: number;
@@ -130,7 +130,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [allAdverts, setAllAdverts] = useState<Advert[]>([]);
 
   // Kategori seçimi için state'leri ekleyelim
-  const [selectedFilterCategories, setSelectedFilterCategories] = useState<number[]>([]);
+  const [selectedFilterCategories, setSelectedFilterCategories] = useState<
+    number[]
+  >([]);
   const [currentFilterLevel, setCurrentFilterLevel] = useState(0);
 
   // Yeni state'leri ekleyelim
@@ -166,12 +168,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     "Van",
   ];
 
-  const TRANSMISSION_TYPES = [
-    "Manuel",
-    "Otomatik",
-    "Yarı Otomatik",
-    "CVT",
-  ];
+  const TRANSMISSION_TYPES = ["Manuel", "Otomatik", "Yarı Otomatik", "CVT"];
 
   const FUEL_TYPES = [
     "Benzin",
@@ -233,7 +230,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     "526 - 550 hp",
     "551 - 575 hp",
     "576 - 600 hp",
-    "601 hp ve üzeri"
+    "601 hp ve üzeri",
   ];
 
   // Yeni state ekleyelim
@@ -265,12 +262,12 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       // Query parametrelerini oluştur
       const queryParams = new URLSearchParams();
-      
+
       // Tüm filtreleri query parametrelerine ekle
       Object.entries(filters || {}).forEach(([key, value]) => {
-        if (value !== undefined && value !== '') {
+        if (value !== undefined && value !== "") {
           if (Array.isArray(value)) {
-            queryParams.append(key, value.join(','));
+            queryParams.append(key, value.join(","));
           } else {
             queryParams.append(key, value.toString());
           }
@@ -278,9 +275,11 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       });
 
       const queryString = queryParams.toString();
-      const url = `${apiurl}/api/ad-listings/search${queryString ? `?${queryString}` : ''}`;
+      const url = `${apiurl}/api/ad-listings/search${
+        queryString ? `?${queryString}` : ""
+      }`;
 
-      console.log('API Request URL:', url);
+      console.log("API Request URL:", url);
 
       const response = await fetch(url, {
         method: "GET",
@@ -299,22 +298,22 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       if (data && Array.isArray(data.$values)) {
         const processedAdverts = data.$values.map((advert: any) => ({
           ...advert,
-          images: advert.images || { $values: [] }
+          images: advert.images || { $values: [] },
         }));
-        
+
         // İşlenmiş ilanlardaki duplikasyonları kontrol et
         const uniqueIds = new Set();
         const duplicates = processedAdverts.filter((ad: Advert) => {
           if (uniqueIds.has(ad.id)) {
-            console.log('Duplike İlan:', ad.id, ad.title);
+            console.log("Duplike İlan:", ad.id, ad.title);
             return true;
           }
           uniqueIds.add(ad.id);
           return false;
         });
-        
+
         if (duplicates.length > 0) {
-          console.log('Duplike İlanlar Bulundu:', duplicates.length);
+          console.log("Duplike İlanlar Bulundu:", duplicates.length);
         }
 
         setAllAdverts(processedAdverts);
@@ -370,10 +369,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
 
-    Promise.all([
-      fetchCategories(),
-      fetchAdverts(),
-    ]).finally(() => {
+    Promise.all([fetchCategories(), fetchAdverts()]).finally(() => {
       setRefreshing(false);
     });
   }, []);
@@ -406,21 +402,26 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       }
 
       // Kategorileri düzleştirmek için yardımcı fonksiyon
-      const flattenCategories = (categories: any[], parentId?: number): Category[] => {
+      const flattenCategories = (
+        categories: any[],
+        parentId?: number
+      ): Category[] => {
         return categories.reduce((acc: Category[], category: any) => {
           // Ana kategoriyi ekle
           const currentCategory: Category = {
             id: category.id,
             name: category.name,
             icon: getIconForCategory(category.id),
-            parentId: parentId
+            parentId: parentId,
           };
 
           acc.push(currentCategory);
 
           // Alt kategorileri varsa onları da ekle
           if (category.children?.$values?.length > 0) {
-            acc.push(...flattenCategories(category.children.$values, category.id));
+            acc.push(
+              ...flattenCategories(category.children.$values, category.id)
+            );
           }
 
           return acc;
@@ -430,7 +431,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       // Ana kategorileri ve alt kategorileri düzleştir
       const flattenedCategories = flattenCategories(data.$values);
       setCategories(flattenedCategories);
-
     } catch (error) {
       console.error("Kategoriler yüklenirken hata oluştu:", error);
       // Hata durumunda varsayılan kategorileri ayarla
@@ -466,17 +466,19 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   // Görüntülenecek kategorileri belirle
   const displayedCategories = useMemo(() => {
     if (selectedMainCategory === "all") {
-      return categories.filter(cat => !cat.parentId);
+      return categories.filter((cat) => !cat.parentId);
     }
 
-    return categories.filter(cat => cat.parentId === selectedCategory);
+    return categories.filter((cat) => cat.parentId === selectedCategory);
   }, [selectedMainCategory, selectedCategory, categories]);
 
   // Geri butonu için fonksiyonu güncelle
   const handleBackButton = async () => {
     try {
       if (selectedCategory !== "all") {
-        const currentCategory = categories.find(cat => cat.id === selectedCategory);
+        const currentCategory = categories.find(
+          (cat) => cat.id === selectedCategory
+        );
         if (currentCategory?.parentId) {
           setSelectedCategory(currentCategory.parentId);
           await fetchCategoryAdverts(currentCategory.parentId);
@@ -498,8 +500,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   // handleCategorySelect fonksiyonunu da düzenleyelim
   const handleCategorySelect = async (categoryId: number) => {
     try {
-      const selectedCat = categories.find(cat => cat.id === categoryId);
-      const hasChildren = categories.some(cat => cat.parentId === categoryId);
+      const selectedCat = categories.find((cat) => cat.id === categoryId);
+      const hasChildren = categories.some((cat) => cat.parentId === categoryId);
 
       if (!selectedCat?.parentId) {
         // Ana kategori seçildi
@@ -528,32 +530,36 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       }
 
       // Önce kategorinin alt kategorilerini al
-      const subCategoriesResponse = await fetch(`${apiurl}/api/categories/${categoryId}/subcategories`);
+      const subCategoriesResponse = await fetch(
+        `${apiurl}/api/categories/${categoryId}/subcategories`
+      );
       const subCategoriesData = await subCategoriesResponse.json();
-      
+
       // Ana kategori ve alt kategorilerin ID'lerini birleştir
       const categoryIds = [categoryId];
       if (subCategoriesData && Array.isArray(subCategoriesData.$values)) {
-        categoryIds.push(...subCategoriesData.$values.map((cat: any) => cat.id));
+        categoryIds.push(
+          ...subCategoriesData.$values.map((cat: any) => cat.id)
+        );
       }
 
       // Tüm kategorilerin ilanlarını al
-      const advertPromises = categoryIds.map(id => 
+      const advertPromises = categoryIds.map((id) =>
         fetch(`${apiurl}/api/ad-listings/category/${id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }).then(res => res.json())
+        }).then((res) => res.json())
       );
 
       const advertsResponses = await Promise.all(advertPromises);
-      
+
       // Benzersiz ilanları tutmak için bir Map kullanalım
       const uniqueAdverts = new Map();
-      
+
       // Tüm ilanları birleştir ve işle
-      advertsResponses.forEach(response => {
+      advertsResponses.forEach((response) => {
         if (response && Array.isArray(response.$values)) {
           response.$values.forEach((advert: any) => {
             // Her ilanı sadece bir kez ekle
@@ -561,8 +567,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               uniqueAdverts.set(advert.id, {
                 ...advert,
                 images: {
-                  $values: advert.images?.$values || [{ url: advert.imageUrl }]
-                }
+                  $values: advert.images?.$values || [{ url: advert.imageUrl }],
+                },
               });
             }
           });
@@ -572,7 +578,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       // Map'ten Array'e çevir
       const allAdverts = Array.from(uniqueAdverts.values());
       setAllAdverts(allAdverts);
-
     } catch (error) {
       console.error("Kategori ilanları yüklenirken hata oluştu:", error);
       setAllAdverts([]);
@@ -586,23 +591,63 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     // Arama filtresi
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(advert => {
-        const title = advert.title?.toLowerCase() || '';
-        const description = advert.description?.toLowerCase() || '';
-        const location = advert.location?.toLowerCase() || '';
-        return title.includes(query) || description.includes(query) || location.includes(query);
+      filtered = filtered.filter((advert) => {
+        // İlan bilgilerini kontrol et
+        const title = advert.title?.toLowerCase() || "";
+        const description = advert.description?.toLowerCase() || "";
+        const location = advert.location?.toLowerCase() || "";
+        const sellerName = advert.sellerName?.toLowerCase() || "";
+        const price = advert.price?.toString().toLowerCase() || "";
+
+        // Kategori ismini bul
+        const category = categories.find((cat) => cat.id === advert.categoryId);
+        const categoryName = category?.name?.toLowerCase() || "";
+
+        // Tüm alanlarda kısmi eşleşme kontrolü
+        return (
+          title.includes(query) ||
+          description.includes(query) ||
+          location.includes(query) ||
+          sellerName.includes(query) ||
+          price.includes(query) ||
+          categoryName.includes(query)
+        );
       });
     }
 
-    // Kategori filtresi
+    // Kategori filtresi - mevcut kategori filtreleme mantığını koru
     if (selectedFilterCategories.length > 0) {
-      const lastSelectedCategory = selectedFilterCategories[selectedFilterCategories.length - 1];
-      filtered = filtered.filter(advert => advert.categoryId === lastSelectedCategory);
+      const lastSelectedCategory =
+        selectedFilterCategories[selectedFilterCategories.length - 1];
+      filtered = filtered.filter((advert) => {
+        // Seçili kategorinin kendisi veya alt kategorilerinden biri mi kontrol et
+        const isDirectMatch = advert.categoryId === lastSelectedCategory;
+        const isSubCategory = categories.some(
+          (cat) =>
+            cat.id === advert.categoryId &&
+            cat.parentId === lastSelectedCategory
+        );
+        return isDirectMatch || isSubCategory;
+      });
+    }
+
+    // Motor gücü filtresi - undefined kontrolü ekle
+    if (enginePower.length > 0) {
+      filtered = filtered.filter((advert) =>
+        advert.enginePower ? enginePower.includes(advert.enginePower) : false
+      );
+    }
+
+    // Motor hacmi filtresi - undefined kontrolü ekle
+    if (engineSize.length > 0) {
+      filtered = filtered.filter((advert) =>
+        advert.engineSize ? engineSize.includes(advert.engineSize) : false
+      );
     }
 
     // Fiyat aralığı filtresi
     if (priceRange.min || priceRange.max) {
-      filtered = filtered.filter(advert => {
+      filtered = filtered.filter((advert) => {
         const price = advert.price;
         const minPrice = priceRange.min ? parseFloat(priceRange.min) : 0;
         const maxPrice = priceRange.max ? parseFloat(priceRange.max) : Infinity;
@@ -614,7 +659,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     if (selectedFilterCategories[0] === 1) {
       // Kilometre filtresi
       if (kmRange.min || kmRange.max) {
-        filtered = filtered.filter(advert => {
+        filtered = filtered.filter((advert) => {
           const km = advert.km || 0;
           const minKm = kmRange.min ? parseInt(kmRange.min) : 0;
           const maxKm = kmRange.max ? parseInt(kmRange.max) : Infinity;
@@ -624,7 +669,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       // Model yılı filtresi
       if (modelRange.min || modelRange.max) {
-        filtered = filtered.filter(advert => {
+        filtered = filtered.filter((advert) => {
           const modelYear = advert.modelYear || 0;
           const minYear = modelRange.min ? parseInt(modelRange.min) : 0;
           const maxYear = modelRange.max ? parseInt(modelRange.max) : Infinity;
@@ -632,6 +677,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         });
       }
 
+<<<<<<< HEAD
       // Motor gücü filtresi
       if (enginePower.length > 0) {
         filtered = filtered.filter(advert => 
@@ -646,31 +692,29 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         );
       }
 
+=======
+>>>>>>> eeb74db6d406569624c36a98459ccf574b2973f9
       // Kasa tipi filtresi
       if (bodyType) {
-        filtered = filtered.filter(advert => 
-          advert.bodyType === bodyType
-        );
+        filtered = filtered.filter((advert) => advert.bodyType === bodyType);
       }
 
       // Vites tipi filtresi
       if (transmission) {
-        filtered = filtered.filter(advert => 
-          advert.transmission === transmission
+        filtered = filtered.filter(
+          (advert) => advert.transmission === transmission
         );
       }
 
       // Yakıt tipi filtresi
       if (fuelType) {
-        filtered = filtered.filter(advert => 
-          advert.fuelType === fuelType
-        );
+        filtered = filtered.filter((advert) => advert.fuelType === fuelType);
       }
     }
 
     // Konum filtresi
     if (selectedLocation) {
-      filtered = filtered.filter(advert => 
+      filtered = filtered.filter((advert) =>
         advert.location?.toLowerCase().includes(selectedLocation.toLowerCase())
       );
     }
@@ -680,6 +724,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     allAdverts,
     searchQuery,
     selectedFilterCategories,
+    categories,
     priceRange,
     kmRange,
     modelRange,
@@ -688,7 +733,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     bodyType,
     transmission,
     fuelType,
-    selectedLocation
+    selectedLocation,
   ]);
 
   // Filtreleri uygula
@@ -700,11 +745,27 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   // searchQuery değiştiğinde filtrelemeyi uygula
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      fetchAdverts({ keyword: searchQuery });
-    }, 500); // 500ms debounce
+      if (searchQuery.trim()) {
+        // Önce tüm ilanları getir, sonra istemci tarafında filtrele
+        fetchAdverts().then(() => {
+          // İlanlar geldiğinde filteredAdverts otomatik olarak güncellenecek
+          // çünkü useMemo hook'u allAdverts değiştiğinde yeniden çalışacak
+        });
+      } else {
+        // Arama boşsa ve kategori seçiliyse sadece kategori ilanlarını getir
+        if (selectedFilterCategories.length > 0) {
+          const lastCategory =
+            selectedFilterCategories[selectedFilterCategories.length - 1];
+          fetchCategoryAdverts(lastCategory);
+        } else {
+          // Hiçbir filtre yoksa tüm ilanları getir
+          fetchAdverts();
+        }
+      }
+    }, 300); // Debounce süresini 300ms'ye düşürelim
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery]);
+  }, [searchQuery, selectedFilterCategories]);
 
   // resetFilters fonksiyonunu güncelleyelim
   const resetFilters = async () => {
@@ -734,19 +795,25 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       >
         <View style={styles.advertImageContainer}>
           {imageUrl ? (
-            <Image 
-              source={{ uri: imageUrl }} 
+            <Image
+              source={{ uri: imageUrl }}
               style={styles.advertImage}
               resizeMode="cover"
-              onError={(e) => console.log('Image loading error:', e.nativeEvent.error)}
+              onError={(e) =>
+                console.log("Image loading error:", e.nativeEvent.error)
+              }
             />
           ) : (
             <View style={styles.defaultImageContainer}>
+<<<<<<< HEAD
               <FontAwesomeIcon 
                 icon={faImage} 
                 size={40} 
                 color="#e0e0e0"
               />
+=======
+              <FontAwesomeIcon icon={faImage} size={40} color="#cccccc" />
+>>>>>>> eeb74db6d406569624c36a98459ccf574b2973f9
             </View>
           )}
           <View style={styles.imageActions}>
@@ -816,35 +883,42 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     const getSelectedCategoryPath = () => {
       if (selectedFilterCategories.length === 0) return "";
 
-      return selectedFilterCategories.map((categoryId, index) => {
-        const categoryList = categoryId === 1 || selectedFilterCategories[0] === 1 
-          ? categories 
-          : categories;
-        const category = categoryList.find(cat => cat.id === categoryId);
-        return category?.name || "";
-      }).filter(Boolean).join(" > ");
+      return selectedFilterCategories
+        .map((categoryId, index) => {
+          const categoryList =
+            categoryId === 1 || selectedFilterCategories[0] === 1
+              ? categories
+              : categories;
+          const category = categoryList.find((cat) => cat.id === categoryId);
+          return category?.name || "";
+        })
+        .filter(Boolean)
+        .join(" > ");
     };
 
     // Alt kategorileri getiren yardımcı fonksiyon
     const getSubCategories = () => {
-      const currentParentId = selectedFilterCategories[selectedFilterCategories.length - 1];
+      const currentParentId =
+        selectedFilterCategories[selectedFilterCategories.length - 1];
       const categoryList = categories;
 
       // Seçili kategorinin alt kategorilerini filtrele
-      const subCategories = categoryList.filter(cat => cat.parentId === currentParentId);
-      
+      const subCategories = categoryList.filter(
+        (cat) => cat.parentId === currentParentId
+      );
+
       // Debug için log ekleyelim
-      console.log('Current Parent ID:', currentParentId);
-      console.log('Category List:', categoryList);
-      console.log('Sub Categories:', subCategories);
-      
+      console.log("Current Parent ID:", currentParentId);
+      console.log("Category List:", categoryList);
+      console.log("Sub Categories:", subCategories);
+
       return subCategories;
     };
 
     // Alt kategori kontrolü için yardımcı fonksiyon
     const hasSubCategories = (categoryId: number) => {
       const categoryList = categories;
-      return categoryList.some(cat => cat.parentId === categoryId);
+      return categoryList.some((cat) => cat.parentId === categoryId);
     };
 
     // Vasıta kategorisi seçili mi kontrolü
@@ -857,14 +931,18 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         animationType="slide"
         onRequestClose={() => setShowFilterModal(false)}
       >
-        <View style={[
-          styles.modalOverlay,
-          isVehicleSelected && styles.modalOverlayVehicle
-        ]}>
-          <View style={[
-            styles.modalContainer,
-            isVehicleSelected && styles.modalContainerVehicle
-          ]}>
+        <View
+          style={[
+            styles.modalOverlay,
+            isVehicleSelected && styles.modalOverlayVehicle,
+          ]}
+        >
+          <View
+            style={[
+              styles.modalContainer,
+              isVehicleSelected && styles.modalContainerVehicle,
+            ]}
+          >
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filtreleme Seçenekleri</Text>
               <TouchableOpacity onPress={() => setShowFilterModal(false)}>
@@ -872,7 +950,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView 
+            <ScrollView
               style={styles.modalContent}
               contentContainerStyle={styles.modalScrollContent}
               showsVerticalScrollIndicator={false}
@@ -892,14 +970,14 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                     // Ana kategoriler
                     <View style={styles.categoriesGrid}>
                       {categories
-                        .filter(cat => !cat.parentId)
+                        .filter((cat) => !cat.parentId)
                         .map((category) => (
                           <TouchableOpacity
                             key={`category-${category.id}`}
                             style={[
                               styles.categoryFilterButton,
-                              selectedFilterCategories[0] === category.id && 
-                              styles.selectedCategoryFilterButton,
+                              selectedFilterCategories[0] === category.id &&
+                                styles.selectedCategoryFilterButton,
                             ]}
                             onPress={() => {
                               setSelectedFilterCategories([category.id]);
@@ -914,8 +992,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                             <Text
                               style={[
                                 styles.categoryFilterText,
-                                selectedFilterCategories[0] === category.id && 
-                                styles.selectedCategoryFilterText,
+                                selectedFilterCategories[0] === category.id &&
+                                  styles.selectedCategoryFilterText,
                               ]}
                             >
                               {category.name}
@@ -930,10 +1008,20 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                         style={styles.backFilterButton}
                         onPress={() => {
                           setCurrentFilterLevel(currentFilterLevel - 1);
-                          setSelectedFilterCategories(prev => prev.slice(0, -1));
+                          setSelectedFilterCategories((prev) =>
+                            prev.slice(0, -1)
+                          );
                         }}
                       >
+<<<<<<< HEAD
                         <FontAwesomeIcon icon={faArrowLeft} size={16} color={COLORS.primary} />
+=======
+                        <FontAwesomeIcon
+                          icon={faArrowLeft}
+                          size={16}
+                          color="#8adbd2"
+                        />
+>>>>>>> eeb74db6d406569624c36a98459ccf574b2973f9
                         <Text style={styles.backFilterText}>Geri</Text>
                       </TouchableOpacity>
                       <View style={styles.categoriesGrid}>
@@ -942,13 +1030,18 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                             key={`subcategory-${category.id}`}
                             style={[
                               styles.categoryFilterButton,
-                              selectedFilterCategories.includes(category.id) && 
-                              styles.selectedCategoryFilterButton,
+                              selectedFilterCategories.includes(category.id) &&
+                                styles.selectedCategoryFilterButton,
                             ]}
                             onPress={() => {
-                              const newSelectedCategories = [...selectedFilterCategories, category.id];
-                              setSelectedFilterCategories(newSelectedCategories);
-                              
+                              const newSelectedCategories = [
+                                ...selectedFilterCategories,
+                                category.id,
+                              ];
+                              setSelectedFilterCategories(
+                                newSelectedCategories
+                              );
+
                               // Alt kategorisi varsa bir sonraki seviyeye geç
                               if (hasSubCategories(category.id)) {
                                 setCurrentFilterLevel(currentFilterLevel + 1);
@@ -958,8 +1051,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                             <Text
                               style={[
                                 styles.categoryFilterText,
-                                selectedFilterCategories.includes(category.id) && 
-                                styles.selectedCategoryFilterText,
+                                selectedFilterCategories.includes(
+                                  category.id
+                                ) && styles.selectedCategoryFilterText,
                               ]}
                             >
                               {category.name}
@@ -982,7 +1076,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                     placeholderTextColor="#999"
                     keyboardType="numeric"
                     value={priceRange.min}
-                    onChangeText={(text) => setPriceRange({ ...priceRange, min: text })}
+                    onChangeText={(text) =>
+                      setPriceRange({ ...priceRange, min: text })
+                    }
                   />
                   <Text style={styles.priceRangeSeparator}>-</Text>
                   <TextInput
@@ -991,7 +1087,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                     placeholderTextColor="#999"
                     keyboardType="numeric"
                     value={priceRange.max}
-                    onChangeText={(text) => setPriceRange({ ...priceRange, max: text })}
+                    onChangeText={(text) =>
+                      setPriceRange({ ...priceRange, max: text })
+                    }
                   />
                 </View>
               </View>
@@ -1009,7 +1107,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                         placeholderTextColor="#999"
                         keyboardType="numeric"
                         value={kmRange.min}
-                        onChangeText={(text) => setKmRange({ ...kmRange, min: text })}
+                        onChangeText={(text) =>
+                          setKmRange({ ...kmRange, min: text })
+                        }
                       />
                       <Text style={styles.priceRangeSeparator}>-</Text>
                       <TextInput
@@ -1018,7 +1118,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                         placeholderTextColor="#999"
                         keyboardType="numeric"
                         value={kmRange.max}
-                        onChangeText={(text) => setKmRange({ ...kmRange, max: text })}
+                        onChangeText={(text) =>
+                          setKmRange({ ...kmRange, max: text })
+                        }
                       />
                     </View>
                   </View>
@@ -1033,7 +1135,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                         placeholderTextColor="#999"
                         keyboardType="numeric"
                         value={modelRange.min}
-                        onChangeText={(text) => setModelRange({ ...modelRange, min: text })}
+                        onChangeText={(text) =>
+                          setModelRange({ ...modelRange, min: text })
+                        }
                       />
                       <Text style={styles.priceRangeSeparator}>-</Text>
                       <TextInput
@@ -1042,7 +1146,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                         placeholderTextColor="#999"
                         keyboardType="numeric"
                         value={modelRange.max}
-                        onChangeText={(text) => setModelRange({ ...modelRange, max: text })}
+                        onChangeText={(text) =>
+                          setModelRange({ ...modelRange, max: text })
+                        }
                       />
                     </View>
                   </View>
@@ -1053,27 +1159,35 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                     <TouchableOpacity
                       style={[
                         styles.engineSizeCollapsed,
-                        enginePower.length > 0 && styles.engineSizeCollapsedSelected
+                        enginePower.length > 0 &&
+                          styles.engineSizeCollapsedSelected,
                       ]}
-                      onPress={() => setIsEnginePowerExpanded(!isEnginePowerExpanded)}
+                      onPress={() =>
+                        setIsEnginePowerExpanded(!isEnginePowerExpanded)
+                      }
                     >
-                      <Text style={[
-                        styles.engineSizeCollapsedText,
-                        enginePower.length > 0 && styles.engineSizeCollapsedTextSelected
-                      ]}>
-                        {enginePower.length > 0 
+                      <Text
+                        style={[
+                          styles.engineSizeCollapsedText,
+                          enginePower.length > 0 &&
+                            styles.engineSizeCollapsedTextSelected,
+                        ]}
+                      >
+                        {enginePower.length > 0
                           ? `${enginePower.length} Motor Gücü Seçildi`
                           : "Motor Gücü Seçin"}
                       </Text>
-                      <FontAwesomeIcon 
-                        icon={isEnginePowerExpanded ? faChevronUp : faChevronDown} 
+                      <FontAwesomeIcon
+                        icon={
+                          isEnginePowerExpanded ? faChevronUp : faChevronDown
+                        }
                         size={18}
                         color={enginePower.length > 0 ? "#fff" : "#666"}
                       />
                     </TouchableOpacity>
 
                     {isEnginePowerExpanded && (
-                      <ScrollView 
+                      <ScrollView
                         style={styles.engineSizeContainer}
                         showsVerticalScrollIndicator={true}
                       >
@@ -1082,12 +1196,13 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                             key={`power-${power}`}
                             style={[
                               styles.engineSizeButton,
-                              enginePower.includes(power) && styles.selectedOptionButton,
+                              enginePower.includes(power) &&
+                                styles.selectedOptionButton,
                             ]}
                             onPress={() => {
-                              setEnginePower(prev => {
+                              setEnginePower((prev) => {
                                 if (prev.includes(power)) {
-                                  return prev.filter(item => item !== power);
+                                  return prev.filter((item) => item !== power);
                                 } else {
                                   return [...prev, power];
                                 }
@@ -1097,7 +1212,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                             <Text
                               style={[
                                 styles.engineSizeText,
-                                enginePower.includes(power) && styles.selectedOptionText,
+                                enginePower.includes(power) &&
+                                  styles.selectedOptionText,
                               ]}
                             >
                               {power}
@@ -1114,27 +1230,35 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                     <TouchableOpacity
                       style={[
                         styles.engineSizeCollapsed,
-                        engineSize.length > 0 && styles.engineSizeCollapsedSelected
+                        engineSize.length > 0 &&
+                          styles.engineSizeCollapsedSelected,
                       ]}
-                      onPress={() => setIsEngineSizeExpanded(!isEngineSizeExpanded)}
+                      onPress={() =>
+                        setIsEngineSizeExpanded(!isEngineSizeExpanded)
+                      }
                     >
-                      <Text style={[
-                        styles.engineSizeCollapsedText,
-                        engineSize.length > 0 && styles.engineSizeCollapsedTextSelected
-                      ]}>
-                        {engineSize.length > 0 
+                      <Text
+                        style={[
+                          styles.engineSizeCollapsedText,
+                          engineSize.length > 0 &&
+                            styles.engineSizeCollapsedTextSelected,
+                        ]}
+                      >
+                        {engineSize.length > 0
                           ? `${engineSize.length} Motor Hacmi Seçildi`
                           : "Motor Hacmi Seçin"}
                       </Text>
-                      <FontAwesomeIcon 
-                        icon={isEngineSizeExpanded ? faChevronUp : faChevronDown} 
+                      <FontAwesomeIcon
+                        icon={
+                          isEngineSizeExpanded ? faChevronUp : faChevronDown
+                        }
                         size={18}
                         color={engineSize.length > 0 ? "#fff" : "#666"}
                       />
                     </TouchableOpacity>
 
                     {isEngineSizeExpanded && (
-                      <ScrollView 
+                      <ScrollView
                         style={styles.engineSizeContainer}
                         showsVerticalScrollIndicator={true}
                       >
@@ -1143,12 +1267,13 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                             key={`size-${size}`}
                             style={[
                               styles.engineSizeButton,
-                              engineSize.includes(size) && styles.selectedOptionButton,
+                              engineSize.includes(size) &&
+                                styles.selectedOptionButton,
                             ]}
                             onPress={() => {
-                              setEngineSize(prev => {
+                              setEngineSize((prev) => {
                                 if (prev.includes(size)) {
-                                  return prev.filter(item => item !== size);
+                                  return prev.filter((item) => item !== size);
                                 } else {
                                   return [...prev, size];
                                 }
@@ -1158,7 +1283,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                             <Text
                               style={[
                                 styles.engineSizeText,
-                                engineSize.includes(size) && styles.selectedOptionText,
+                                engineSize.includes(size) &&
+                                  styles.selectedOptionText,
                               ]}
                             >
                               {size}
@@ -1180,7 +1306,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                             styles.optionButton,
                             bodyType === type && styles.selectedOptionButton,
                           ]}
-                          onPress={() => setBodyType(bodyType === type ? "" : type)}
+                          onPress={() =>
+                            setBodyType(bodyType === type ? "" : type)
+                          }
                         >
                           <Text
                             style={[
@@ -1204,14 +1332,18 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                           key={`transmission-${type}`}
                           style={[
                             styles.optionButton,
-                            transmission === type && styles.selectedOptionButton,
+                            transmission === type &&
+                              styles.selectedOptionButton,
                           ]}
-                          onPress={() => setTransmission(transmission === type ? "" : type)}
+                          onPress={() =>
+                            setTransmission(transmission === type ? "" : type)
+                          }
                         >
                           <Text
                             style={[
                               styles.optionText,
-                              transmission === type && styles.selectedOptionText,
+                              transmission === type &&
+                                styles.selectedOptionText,
                             ]}
                           >
                             {type}
@@ -1232,7 +1364,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                             styles.optionButton,
                             fuelType === type && styles.selectedOptionButton,
                           ]}
-                          onPress={() => setFuelType(fuelType === type ? "" : type)}
+                          onPress={() =>
+                            setFuelType(fuelType === type ? "" : type)
+                          }
                         >
                           <Text
                             style={[
@@ -1305,7 +1439,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => {/* Öne çıkanları getir */}}
+            onPress={() => {
+              /* Öne çıkanları getir */
+            }}
           >
             <FontAwesomeIcon icon={faStar} size={18} color={COLORS.primary} />
             <Text style={styles.actionButtonText}>Öne Çıkanlar</Text>
@@ -1344,7 +1480,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                 key={`category-${category.id}`}
                 style={[
                   styles.categoryItem,
-                  selectedCategory === category.id && styles.selectedCategoryItem,
+                  selectedCategory === category.id &&
+                    styles.selectedCategoryItem,
                 ]}
                 onPress={() => handleCategorySelect(category.id)}
               >
@@ -1358,7 +1495,13 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                   <IconView
                     name={category.icon}
                     size={24}
+<<<<<<< HEAD
                     color={selectedCategory === category.id ? "#fff" : COLORS.primary}
+=======
+                    color={
+                      selectedCategory === category.id ? "#fff" : "#8adbd2"
+                    }
+>>>>>>> eeb74db6d406569624c36a98459ccf574b2973f9
                   />
                 </View>
                 <Text
@@ -1517,6 +1660,7 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   advertItem: {
+<<<<<<< HEAD
     flexDirection: 'row',
     backgroundColor: COLORS.surface,
     borderRadius: 20,
@@ -1556,6 +1700,37 @@ const styles = StyleSheet.create({
   },
   favoriteButton: {
     backgroundColor: '#fff',
+=======
+    flexDirection: "row",
+    backgroundColor: "white",
+    borderRadius: 15,
+    marginBottom: 15,
+    padding: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    overflow: "hidden", // Taşan içeriği gizle
+  },
+  advertImageContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: "#f0f0f0",
+  },
+  advertImage: {
+    width: "100%",
+    height: "100%",
+  },
+  defaultImageContainer: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f0f0f0",
+>>>>>>> eeb74db6d406569624c36a98459ccf574b2973f9
   },
   advertInfo: {
     flex: 1,
@@ -1780,8 +1955,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 15,
-    color: '#333',
-    backgroundColor: '#fff',
+    color: "#333",
+    backgroundColor: "#fff",
   },
   priceRangeSeparator: {
     marginHorizontal: 10,
@@ -1834,7 +2009,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   selectedCategoryPath: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#f5f5f5",
     borderRadius: 8,
     padding: 10,
     marginTop: 5,
@@ -1842,82 +2017,82 @@ const styles = StyleSheet.create({
   },
   selectedCategoryPathText: {
     fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
+    color: "#666",
+    fontWeight: "500",
   },
   fullWidthInput: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "#ddd",
     borderRadius: 8,
     padding: 12,
     fontSize: 15,
-    color: '#333',
+    color: "#333",
   },
-  
+
   optionsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     marginTop: 10,
     marginHorizontal: -5,
   },
-  
+
   optionButton: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     margin: 5,
   },
-  
+
   selectedOptionButton: {
-    backgroundColor: '#8adbd2',
+    backgroundColor: "#8adbd2",
   },
-  
+
   optionText: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
-  
+
   selectedOptionText: {
-    color: '#fff',
-    fontWeight: '500',
+    color: "#fff",
+    fontWeight: "500",
   },
 
   engineSizeCollapsed: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
     borderRadius: 8,
     padding: 16,
     height: 56,
   },
 
   engineSizeCollapsedSelected: {
-    backgroundColor: '#8adbd2',
+    backgroundColor: "#8adbd2",
   },
 
   engineSizeCollapsedText: {
     fontSize: 15,
-    color: '#333',
+    color: "#333",
   },
 
   engineSizeCollapsedTextSelected: {
-    color: '#fff',
-    fontWeight: '500',
+    color: "#fff",
+    fontWeight: "500",
   },
 
   engineSizeContainer: {
     maxHeight: 300,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
     borderRadius: 8,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     marginTop: 8,
   },
 
@@ -1925,18 +2100,18 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    backgroundColor: '#fff',
+    borderBottomColor: "#eee",
+    backgroundColor: "#fff",
   },
 
   engineSizeText: {
     fontSize: 16,
-    color: '#333',
-    textAlign: 'left',
+    color: "#333",
+    textAlign: "left",
   },
 
   placeholderText: {
-    color: '#999',
+    color: "#999",
   },
 
   bottomNav: {
@@ -1965,15 +2140,15 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 50,
     paddingHorizontal: 20,
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+    color: "#666",
+    textAlign: "center",
     marginTop: 15,
     lineHeight: 24,
   },
@@ -1985,44 +2160,44 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   categoriesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     marginHorizontal: -5,
   },
   categoryFilterButton: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
     borderRadius: 8,
     paddingHorizontal: 15,
     paddingVertical: 10,
     margin: 5,
-    minWidth: '30%',
+    minWidth: "30%",
   },
   selectedCategoryFilterButton: {
-    backgroundColor: '#8adbd2',
-    borderColor: '#8adbd2',
+    backgroundColor: "#8adbd2",
+    borderColor: "#8adbd2",
   },
   categoryFilterText: {
     fontSize: 14,
-    color: '#333',
-    textAlign: 'center',
+    color: "#333",
+    textAlign: "center",
   },
   selectedCategoryFilterText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    color: "#fff",
+    fontWeight: "bold",
   },
   backFilterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 10,
     marginBottom: 10,
   },
   backFilterText: {
     marginLeft: 8,
-    color: '#8adbd2',
+    color: "#8adbd2",
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   advertImage: {
     width: '100%',
