@@ -89,6 +89,24 @@ type Advert = {
   fuelType?: string;
 };
 
+// Renk paletini güncelleyelim
+const COLORS = {
+  primary: '#00A693',       // Modern Turkuaz
+  secondary: '#FF6B6B',     // Canlı Mercan
+  background: '#F7F9FC',    // Açık Gri-Mavi
+  surface: '#FFFFFF',
+  text: {
+    primary: '#1A2138',     // Koyu Lacivert
+    secondary: '#4A5568',   // Orta Gri
+    tertiary: '#A0AEC0',    // Açık Gri
+  },
+  border: '#E2E8F0',
+  success: '#48BB78',
+  warning: '#F6AD55',
+  error: '#FC8181',
+  shadow: 'rgba(26, 33, 56, 0.1)',
+};
+
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedCategory, setSelectedCategory] = useState<number | "all">(
     "all"
@@ -617,14 +635,14 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       // Motor gücü filtresi
       if (enginePower.length > 0) {
         filtered = filtered.filter(advert => 
-          enginePower.includes(advert.enginePower)
+          advert.enginePower && enginePower.includes(advert.enginePower)
         );
       }
 
       // Motor hacmi filtresi
       if (engineSize.length > 0) {
         filtered = filtered.filter(advert => 
-          engineSize.includes(advert.engineSize)
+          advert.engineSize && engineSize.includes(advert.engineSize)
         );
       }
 
@@ -727,31 +745,45 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               <FontAwesomeIcon 
                 icon={faImage} 
                 size={40} 
-                color="#cccccc"
+                color="#e0e0e0"
               />
             </View>
           )}
+          <View style={styles.imageActions}>
+            <TouchableOpacity style={styles.imageActionButton}>
+              <FontAwesomeIcon icon={faEnvelope} size={18} color={COLORS.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.imageActionButton, styles.favoriteButton]}>
+              <FontAwesomeIcon icon={faHeart} size={18} color={COLORS.secondary} />
+            </TouchableOpacity>
+          </View>
         </View>
         <View style={styles.advertInfo}>
-          <Text style={styles.advertTitle}>{item.title}</Text>
-          <Text style={styles.advertPrice}>{item.price} TL</Text>
+          <View style={styles.advertHeader}>
+            <View style={styles.titleContainer}>
+              <Text style={styles.advertTitle} numberOfLines={2}>
+                {item.title.toUpperCase()}
+              </Text>
+            </View>
+            <Text style={styles.advertPrice}>{item.price.toLocaleString('tr-TR')} ₺</Text>
+          </View>
+          
           <Text style={styles.advertDescription} numberOfLines={2}>
             {item.description}
           </Text>
 
           <View style={styles.advertFooter}>
             <View style={styles.sellerInfo}>
-              <Text style={styles.sellerName}>{item.sellerName}</Text>
-              <Text style={styles.advertDistance}>{item.distance}</Text>
-            </View>
-
-            <View style={styles.actionButtons}>
-              <TouchableOpacity style={styles.actionButton}>
-                <Text style={styles.actionIcon}>📞</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
-                <Text style={styles.actionIcon}>💬</Text>
-              </TouchableOpacity>
+              <View style={styles.infoRow}>
+                <View style={styles.infoItem}>
+                  <FontAwesomeIcon icon={faUser} size={14} color={COLORS.text.primary} />
+                  <Text style={styles.infoText}>{item.sellerName || "İsimsiz Satıcı"}</Text>
+                </View>
+                <View style={styles.infoItem}>
+                  <FontAwesomeIcon icon={faMap} size={14} color={COLORS.text.primary} />
+                  <Text style={styles.infoText}>{item.location || "Konum belirtilmemiş"}</Text>
+                </View>
+              </View>
             </View>
           </View>
         </View>
@@ -762,7 +794,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const renderCategory = ({ item }: { item: Category }) => (
     <TouchableOpacity style={styles.categoryItem}>
       <View style={styles.categoryIconContainer}>
-        <IconView name={item.icon} size={24} color="#8adbd2" />
+        <IconView name={item.icon} size={24} color={COLORS.primary} />
       </View>
       <Text style={styles.categoryName}>{item.name}</Text>
     </TouchableOpacity>
@@ -901,7 +933,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                           setSelectedFilterCategories(prev => prev.slice(0, -1));
                         }}
                       >
-                        <FontAwesomeIcon icon={faArrowLeft} size={16} color="#8adbd2" />
+                        <FontAwesomeIcon icon={faArrowLeft} size={16} color={COLORS.primary} />
                         <Text style={styles.backFilterText}>Geri</Text>
                       </TouchableOpacity>
                       <View style={styles.categoriesGrid}>
@@ -1268,21 +1300,21 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.actionButton}
             onPress={() => setShowCategories(!showCategories)}
           >
-            <FontAwesomeIcon icon={faThLarge} size={18} color="#8adbd2" />
+            <FontAwesomeIcon icon={faThLarge} size={18} color={COLORS.primary} />
             <Text style={styles.actionButtonText}>Kategoriler</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => {/* Öne çıkanları getir */}}
           >
-            <FontAwesomeIcon icon={faStar} size={18} color="#8adbd2" />
+            <FontAwesomeIcon icon={faStar} size={18} color={COLORS.primary} />
             <Text style={styles.actionButtonText}>Öne Çıkanlar</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => setShowFilterModal(true)}
           >
-            <FontAwesomeIcon icon={faFilter} size={18} color="#8adbd2" />
+            <FontAwesomeIcon icon={faFilter} size={18} color={COLORS.primary} />
             <Text style={styles.actionButtonText}>Filtrele</Text>
           </TouchableOpacity>
         </View>
@@ -1296,7 +1328,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               style={styles.backButton}
               onPress={handleBackButton}
             >
-              <FontAwesomeIcon icon={faArrowLeft} size={16} color="#8adbd2" />
+              <FontAwesomeIcon icon={faArrowLeft} size={16} color={COLORS.primary} />
               <Text style={styles.backButtonText}>
                 {selectedCategory !== "all" ? "Geri" : "Ana Kategoriler"}
               </Text>
@@ -1326,7 +1358,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                   <IconView
                     name={category.icon}
                     size={24}
-                    color={selectedCategory === category.id ? "#fff" : "#8adbd2"}
+                    color={selectedCategory === category.id ? "#fff" : COLORS.primary}
                   />
                 </View>
                 <Text
@@ -1367,7 +1399,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           style={styles.bottomNavItem}
           onPress={() => navigation.navigate("Profile")}
         >
-          <FontAwesomeIcon icon={faUser} size={24} color="#8adbd2" />
+          <FontAwesomeIcon icon={faUser} size={24} color={COLORS.primary} />
           <Text style={styles.bottomNavText}>Profil</Text>
         </TouchableOpacity>
 
@@ -1375,7 +1407,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           style={styles.bottomNavItem}
           onPress={() => navigation.navigate("MyAds")}
         >
-          <FontAwesomeIcon icon={faShoppingBag} size={24} color="#8adbd2" />
+          <FontAwesomeIcon icon={faShoppingBag} size={24} color={COLORS.primary} />
           <Text style={styles.bottomNavText}>İlanlarım</Text>
         </TouchableOpacity>
 
@@ -1390,7 +1422,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           style={styles.bottomNavItem}
           onPress={() => navigation.navigate("Favs")}
         >
-          <FontAwesomeIcon icon={faHeart} size={24} color="#8adbd2" />
+          <FontAwesomeIcon icon={faHeart} size={24} color={COLORS.primary} />
           <Text style={styles.bottomNavText}>Favoriler</Text>
         </TouchableOpacity>
 
@@ -1398,7 +1430,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           style={styles.bottomNavItem}
           onPress={() => navigation.navigate("MessagesArea")}
         >
-          <FontAwesomeIcon icon={faEnvelope} size={24} color="#8adbd2" />
+          <FontAwesomeIcon icon={faEnvelope} size={24} color={COLORS.primary} />
           <Text style={styles.bottomNavText}>Mesajlarım</Text>
         </TouchableOpacity>
       </View>
@@ -1409,7 +1441,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: COLORS.background,
   },
   sectionTitle: {
     fontSize: 18,
@@ -1429,24 +1461,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
   } as ViewStyle,
   categoryItem: {
-    alignItems: "center",
-    marginRight: 20,
-    width: 80,
-  } as ViewStyle,
-  categoryIconContainer: {
-    width: 65,
-    height: 65,
-    borderRadius: 20, // Daha modern köşeler
-    backgroundColor: "#f0f7ff",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
-    shadowColor: "#8adbd2",
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginRight: 12,
+    shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 4,
-  } as ViewStyle,
+    elevation: 2,
+  },
+  categoryIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   categoryName: {
     fontSize: 12,
     textAlign: "center",
@@ -1455,15 +1489,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
   } as TextStyle,
   selectedCategoryItem: {
-    transform: [{ scale: 1.05 }], // Seçili kategoriyi biraz büyüt
-  } as ViewStyle,
+    backgroundColor: COLORS.primary,
+  },
   selectedCategoryIconContainer: {
-    backgroundColor: "#8adbd2",
-    shadowColor: "#8adbd2",
-    shadowOpacity: 0.25,
-  } as ViewStyle,
+    backgroundColor: COLORS.primary,
+  },
   selectedCategoryName: {
-    color: "#8adbd2",
+    color: "#fff",
     fontWeight: "600",
   } as TextStyle,
   backButton: {
@@ -1481,102 +1513,105 @@ const styles = StyleSheet.create({
   } as TextStyle,
   listContainer: {
     flexGrow: 1,
-    paddingHorizontal: 15,
+    paddingTop: 8,
     paddingBottom: 80,
   },
   advertItem: {
     flexDirection: 'row',
-    backgroundColor: 'white',
-    borderRadius: 15,
-    marginBottom: 15,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    marginHorizontal: 12,
+    marginVertical: 8,
+    marginTop: 12,
+    padding: 16,
+    width: '95%',
+    alignSelf: 'center',
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    overflow: 'hidden', // Taşan içeriği gizle
+    shadowRadius: 24,
+    elevation: 4,
   },
   advertImageContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 10,
+    width: 140,
+    height: 140,
+    borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: COLORS.background,
   },
-  advertImage: {
-    width: '100%',
-    height: '100%',
+  imageActions: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
   },
-  defaultImageContainer: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+  imageActionButton: {
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: COLORS.background,
+  },
+  favoriteButton: {
+    backgroundColor: '#fff',
   },
   advertInfo: {
     flex: 1,
-    marginLeft: 15,
-    justifyContent: "space-between",
+    marginLeft: 16,
+    justifyContent: 'space-between',
+  },
+  advertHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  titleContainer: {
+    flex: 1,
+    marginRight: 12,
   },
   advertTitle: {
     fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 5,
-    color: "#333",
-  },
-  advertPrice: {
-    fontSize: 16,
-    color: "#4CAF50",
-    fontWeight: "bold",
-    marginBottom: 5,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+    letterSpacing: 0.5,
+    marginBottom: 8,
   },
   advertDescription: {
-    fontSize: 13,
-    color: "#666",
-    marginBottom: 10,
-    lineHeight: 18,
+    fontSize: 14,
+    color: COLORS.text.secondary,
+    lineHeight: 20,
+    marginBottom: 12,
   },
   advertFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 5,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginTop: 4,
   },
   sellerInfo: {
-    flexDirection: "column",
-  },
-  sellerName: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#555",
-  },
-  advertDistance: {
-    fontSize: 12,
-    color: "#888",
-    marginTop: 2,
-  },
-  actionButtons: {
-    flexDirection: "row",
-  },
-  actionButton: {
     flex: 1,
-    flexDirection: "column",
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: "#fff",
-    marginHorizontal: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
   },
-  actionIcon: {
-    fontSize: 16,
+  infoRow: {
+    flexDirection: 'column',
+    gap: 8,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    marginBottom: 6,
+  },
+  infoText: {
+    fontSize: 13,
+    color: COLORS.text.secondary,
+    marginLeft: 8,
+    fontWeight: '500',
   },
   footer: {
     position: "absolute",
@@ -1602,18 +1637,18 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   addButton: {
-    backgroundColor: "#8adbd2",
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    backgroundColor: COLORS.primary,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    transform: [{ translateY: -20 }],
   },
   addButtonText: {
     fontSize: 10,
@@ -1622,31 +1657,30 @@ const styles = StyleSheet.create({
   },
   // Arama ve Filtreleme Stilleri
   searchContainer: {
-    flexDirection: "column",
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-    gap: 10,
+    borderBottomColor: COLORS.border,
   },
   searchInputContainer: {
-    flexDirection: "row",
-    backgroundColor: "#f5f5f5",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 12,
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
-    color: "#333",
-    marginLeft: 8,
+    fontSize: 15,
+    color: COLORS.text.primary,
+    marginLeft: 12,
   },
   searchIcon: {
     fontSize: 16,
-    color: "#666",
+    color: '#666',
   },
   actionButtonsContainer: {
     flexDirection: "row",
@@ -1658,21 +1692,23 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     fontSize: 12,
-    color: "#333",
+    color: '#333',
     marginTop: 4,
-    fontWeight: "500",
+    fontWeight: '500',
   },
   filterButton: {
-    marginLeft: 10,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#f5f5f5",
-    justifyContent: "center",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0faf9',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 6,
   },
-  filterIcon: {
-    fontSize: 18,
+  filterButtonText: {
+    color: '#4B5563',
+    fontSize: 14,
+    fontWeight: '500',
   },
 
   // Modal Stilleri
@@ -1752,12 +1788,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666",
   },
-  locationContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginBottom: 10,
-    paddingHorizontal: 5,
-  },
   locationButton: {
     backgroundColor: "#f5f5f5",
     paddingHorizontal: 12,
@@ -1768,10 +1798,6 @@ const styles = StyleSheet.create({
   },
   selectedLocationButton: {
     backgroundColor: "#8adbd2",
-  },
-  locationButtonText: {
-    fontSize: 14,
-    color: "#666",
   },
   selectedLocationButtonText: {
     color: "#fff",
@@ -1797,7 +1823,7 @@ const styles = StyleSheet.create({
   },
   applyButton: {
     flex: 1,
-    backgroundColor: "#8adbd2",
+    backgroundColor: COLORS.primary,
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: "center",
@@ -1914,17 +1940,19 @@ const styles = StyleSheet.create({
   },
 
   bottomNav: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    paddingVertical: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     borderTopWidth: 1,
-    borderTopColor: "#eee",
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
+    borderTopColor: COLORS.border,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
   },
   bottomNavItem: {
     alignItems: "center",
@@ -1995,6 +2023,41 @@ const styles = StyleSheet.create({
     color: '#8adbd2',
     fontSize: 14,
     fontWeight: '500',
+  },
+  advertImage: {
+    width: '100%',
+    height: '100%',
+  },
+  defaultImageContainer: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0faf9',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  advertPrice: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '700',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: COLORS.primary,
+    borderRadius: 10,
+    overflow: 'hidden',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
 });
 
