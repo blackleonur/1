@@ -109,7 +109,10 @@ const MyAdsScreen: React.FC<Props> = ({ navigation }) => {
             Alert.alert("Başarılı", "İlan başarıyla silindi");
           } catch (error) {
             const err = error as Error;
-            Alert.alert("Hata", `İlan silinirken bir hata oluştu: ${err.message}`);
+            Alert.alert(
+              "Hata",
+              `İlan silinirken bir hata oluştu: ${err.message}`
+            );
             console.error("Silme hatası:", err);
           }
         },
@@ -166,7 +169,7 @@ const MyAdsScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.actionButtons}>
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={() => navigation.navigate("AddAdvert", { adId: item.id })}
+          onPress={() => navigation.navigate("EditAd", { adId: item.id })}
         >
           <FontAwesomeIcon icon={faEdit} size={20} color="#8adbd2" />
         </TouchableOpacity>
@@ -210,7 +213,9 @@ const MyAdsScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.emptyText}>Henüz ilanınız bulunmuyor</Text>
           <TouchableOpacity
             style={styles.addButton}
-            onPress={() => navigation.navigate("AddAdvert", { adId: undefined })}
+            onPress={() =>
+              navigation.navigate("AddAdvert", { adId: undefined })
+            }
           >
             <Text style={styles.addButtonText}>Yeni İlan Ekle</Text>
           </TouchableOpacity>
@@ -223,7 +228,7 @@ const MyAdsScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f8f8",
+    backgroundColor: "#f0f0f0",
   },
   loadingContainer: {
     flex: 1,
@@ -236,43 +241,43 @@ const styles = StyleSheet.create({
   adCard: {
     flexDirection: "row",
     backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 10,
+    borderRadius: 15,
+    padding: 15,
+    marginBottom: 15,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   adImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 5,
+    width: 100,
+    height: 100,
+    borderRadius: 10,
   },
   adInfo: {
     flex: 1,
-    marginLeft: 10,
+    marginLeft: 15,
     justifyContent: "center",
   },
   adTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
     color: "#333",
     marginBottom: 5,
   },
   adPrice: {
-    fontSize: 15,
+    fontSize: 16,
     color: "#8adbd2",
     fontWeight: "bold",
-    marginBottom: 3,
+    marginBottom: 5,
   },
   adStatus: {
-    fontSize: 14,
-    marginBottom: 3,
+    fontSize: 15,
+    marginBottom: 5,
   },
   adCategory: {
-    fontSize: 14,
+    fontSize: 15,
     color: "#666",
   },
   actionButtons: {
@@ -289,19 +294,19 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 18,
     color: "#666",
     marginBottom: 20,
   },
   addButton: {
     backgroundColor: "#8adbd2",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 25,
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 30,
   },
   addButtonText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
   },
 });

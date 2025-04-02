@@ -1,3 +1,3 @@
-const apiurl = "http://10.30.144.156:5272";
+const apiurl = "http://192.168.1.108:5150";
 
 export default apiurl;

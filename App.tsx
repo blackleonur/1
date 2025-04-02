@@ -18,6 +18,7 @@ import FavsScreen from "./src/screens/FavsScreen";
 import MyAdsScreen from "./src/screens/MyAdsScreen";
 import PrivacyScreen from "./src/screens/PrivacyScreen";
 import HelpScreen from "./src/screens/HelpScreen";
+import EditAdScreen from "./src/screens/EditAdScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -123,6 +124,7 @@ export default function App() {
             },
           }}
         />
+        <Stack.Screen name="EditAd" component={EditAdScreen} />
       </Stack.Navigator>
       <StatusBar style="auto" />
     </NavigationContainer>
