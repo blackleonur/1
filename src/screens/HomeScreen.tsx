@@ -54,9 +54,9 @@ import {
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
-type Props = {
-  navigation: HomeScreenNavigationProp;
-};
+interface Props {
+  navigation: any; // Daha spesifik bir tip kullanılabilir
+}
 
 type Category = {
   id: number;
@@ -91,20 +91,20 @@ type Advert = {
 
 // Renk paletini güncelleyelim
 const COLORS = {
-  primary: '#00A693',       // Modern Turkuaz
-  secondary: '#FF6B6B',     // Canlı Mercan
-  background: '#F7F9FC',    // Açık Gri-Mavi
-  surface: '#FFFFFF',
+  primary: "#00A693", // Modern Turkuaz
+  secondary: "#FF6B6B", // Canlı Mercan
+  background: "#F7F9FC", // Açık Gri-Mavi
+  surface: "#FFFFFF",
   text: {
-    primary: '#1A2138',     // Koyu Lacivert
-    secondary: '#4A5568',   // Orta Gri
-    tertiary: '#A0AEC0',    // Açık Gri
+    primary: "#1A2138", // Koyu Lacivert
+    secondary: "#4A5568", // Orta Gri
+    tertiary: "#A0AEC0", // Açık Gri
   },
-  border: '#E2E8F0',
-  success: '#48BB78',
-  warning: '#F6AD55',
-  error: '#FC8181',
-  shadow: 'rgba(26, 33, 56, 0.1)',
+  border: "#E2E8F0",
+  success: "#48BB78",
+  warning: "#F6AD55",
+  error: "#FC8181",
+  shadow: "rgba(26, 33, 56, 0.1)",
 };
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
@@ -631,17 +631,18 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       });
     }
 
-    // Motor gücü filtresi - undefined kontrolü ekle
+    // Motor gücü filtresi
     if (enginePower.length > 0) {
-      filtered = filtered.filter((advert) =>
-        advert.enginePower ? enginePower.includes(advert.enginePower) : false
+      filtered = filtered.filter(
+        (advert) =>
+          advert.enginePower && enginePower.includes(advert.enginePower)
       );
     }
 
-    // Motor hacmi filtresi - undefined kontrolü ekle
+    // Motor hacmi filtresi
     if (engineSize.length > 0) {
-      filtered = filtered.filter((advert) =>
-        advert.engineSize ? engineSize.includes(advert.engineSize) : false
+      filtered = filtered.filter(
+        (advert) => advert.engineSize && engineSize.includes(advert.engineSize)
       );
     }
 
@@ -677,23 +678,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         });
       }
 
-<<<<<<< HEAD
-      // Motor gücü filtresi
-      if (enginePower.length > 0) {
-        filtered = filtered.filter(advert => 
-          advert.enginePower && enginePower.includes(advert.enginePower)
-        );
-      }
-
-      // Motor hacmi filtresi
-      if (engineSize.length > 0) {
-        filtered = filtered.filter(advert => 
-          advert.engineSize && engineSize.includes(advert.engineSize)
-        );
-      }
-
-=======
->>>>>>> eeb74db6d406569624c36a98459ccf574b2973f9
       // Kasa tipi filtresi
       if (bodyType) {
         filtered = filtered.filter((advert) => advert.bodyType === bodyType);
@@ -738,7 +722,26 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   // Filtreleri uygula
   const applyFilters = () => {
-    // Sadece modalı kapat, filtreleme işlemi useMemo ile otomatik yapılacak
+    const filters: any = {};
+
+    if (selectedFilterCategories.length > 0) {
+      filters.categoryId = selectedFilterCategories[selectedFilterCategories.length - 1];
+    }
+
+    if (priceRange.min) filters.minPrice = parseInt(priceRange.min);
+    if (priceRange.max) filters.maxPrice = parseInt(priceRange.max);
+    if (kmRange.min) filters.minKm = parseInt(kmRange.min);
+    if (kmRange.max) filters.maxKm = parseInt(kmRange.max);
+    if (modelRange.min) filters.minModelYear = parseInt(modelRange.min);
+    if (modelRange.max) filters.maxModelYear = parseInt(modelRange.max);
+    if (enginePower.length > 0) filters.enginePowers = enginePower;
+    if (engineSize.length > 0) filters.engineSizes = engineSize;
+    if (bodyType) filters.bodyType = bodyType;
+    if (transmission) filters.transmission = transmission;
+    if (fuelType) filters.fuelType = fuelType;
+    if (selectedLocation) filters.location = selectedLocation;
+
+    fetchAdverts(filters);
     setShowFilterModal(false);
   };
 
@@ -768,12 +771,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   }, [searchQuery, selectedFilterCategories]);
 
   // resetFilters fonksiyonunu güncelleyelim
-  const resetFilters = async () => {
+  const resetFilters = () => {
     setPriceRange({ min: "", max: "" });
-    setSelectedLocation("");
-    setSearchQuery("");
-    setSelectedFilterCategories([]);
-    setCurrentFilterLevel(0);
     setKmRange({ min: "", max: "" });
     setModelRange({ min: "", max: "" });
     setEnginePower([]);
@@ -781,8 +780,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     setBodyType("");
     setTransmission("");
     setFuelType("");
-    await fetchAdverts();
-    setShowFilterModal(false);
+    setSelectedLocation("");
   };
 
   const renderItem = ({ item }: { item: Advert }) => {
@@ -805,23 +803,25 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             />
           ) : (
             <View style={styles.defaultImageContainer}>
-<<<<<<< HEAD
-              <FontAwesomeIcon 
-                icon={faImage} 
-                size={40} 
-                color="#e0e0e0"
-              />
-=======
               <FontAwesomeIcon icon={faImage} size={40} color="#cccccc" />
->>>>>>> eeb74db6d406569624c36a98459ccf574b2973f9
             </View>
           )}
           <View style={styles.imageActions}>
             <TouchableOpacity style={styles.imageActionButton}>
-              <FontAwesomeIcon icon={faEnvelope} size={18} color={COLORS.primary} />
+              <FontAwesomeIcon
+                icon={faEnvelope}
+                size={18}
+                color={COLORS.primary}
+              />
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.imageActionButton, styles.favoriteButton]}>
-              <FontAwesomeIcon icon={faHeart} size={18} color={COLORS.secondary} />
+            <TouchableOpacity
+              style={[styles.imageActionButton, styles.favoriteButton]}
+            >
+              <FontAwesomeIcon
+                icon={faHeart}
+                size={18}
+                color={COLORS.secondary}
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -832,9 +832,11 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                 {item.title.toUpperCase()}
               </Text>
             </View>
-            <Text style={styles.advertPrice}>{item.price.toLocaleString('tr-TR')} ₺</Text>
+            <Text style={styles.advertPrice}>
+              {item.price.toLocaleString("tr-TR")} ₺
+            </Text>
           </View>
-          
+
           <Text style={styles.advertDescription} numberOfLines={2}>
             {item.description}
           </Text>
@@ -843,12 +845,24 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.sellerInfo}>
               <View style={styles.infoRow}>
                 <View style={styles.infoItem}>
-                  <FontAwesomeIcon icon={faUser} size={14} color={COLORS.text.primary} />
-                  <Text style={styles.infoText}>{item.sellerName || "İsimsiz Satıcı"}</Text>
+                  <FontAwesomeIcon
+                    icon={faUser}
+                    size={14}
+                    color={COLORS.text.primary}
+                  />
+                  <Text style={styles.infoText}>
+                    {item.sellerName || "İsimsiz Satıcı"}
+                  </Text>
                 </View>
                 <View style={styles.infoItem}>
-                  <FontAwesomeIcon icon={faMap} size={14} color={COLORS.text.primary} />
-                  <Text style={styles.infoText}>{item.location || "Konum belirtilmemiş"}</Text>
+                  <FontAwesomeIcon
+                    icon={faMap}
+                    size={14}
+                    color={COLORS.text.primary}
+                  />
+                  <Text style={styles.infoText}>
+                    {item.location || "Konum belirtilmemiş"}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -1013,15 +1027,11 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                           );
                         }}
                       >
-<<<<<<< HEAD
-                        <FontAwesomeIcon icon={faArrowLeft} size={16} color={COLORS.primary} />
-=======
                         <FontAwesomeIcon
                           icon={faArrowLeft}
                           size={16}
                           color="#8adbd2"
                         />
->>>>>>> eeb74db6d406569624c36a98459ccf574b2973f9
                         <Text style={styles.backFilterText}>Geri</Text>
                       </TouchableOpacity>
                       <View style={styles.categoriesGrid}>
@@ -1417,7 +1427,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Arama ve Filtreleme Alanı */}
       <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
@@ -1434,7 +1444,11 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.actionButton}
             onPress={() => setShowCategories(!showCategories)}
           >
-            <FontAwesomeIcon icon={faThLarge} size={18} color={COLORS.primary} />
+            <FontAwesomeIcon
+              icon={faThLarge}
+              size={18}
+              color={COLORS.primary}
+            />
             <Text style={styles.actionButtonText}>Kategoriler</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -1464,7 +1478,11 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               style={styles.backButton}
               onPress={handleBackButton}
             >
-              <FontAwesomeIcon icon={faArrowLeft} size={16} color={COLORS.primary} />
+              <FontAwesomeIcon
+                icon={faArrowLeft}
+                size={16}
+                color={COLORS.primary}
+              />
               <Text style={styles.backButtonText}>
                 {selectedCategory !== "all" ? "Geri" : "Ana Kategoriler"}
               </Text>
@@ -1495,13 +1513,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                   <IconView
                     name={category.icon}
                     size={24}
-<<<<<<< HEAD
                     color={selectedCategory === category.id ? "#fff" : COLORS.primary}
-=======
-                    color={
-                      selectedCategory === category.id ? "#fff" : "#8adbd2"
-                    }
->>>>>>> eeb74db6d406569624c36a98459ccf574b2973f9
                   />
                 </View>
                 <Text
@@ -1550,7 +1562,11 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           style={styles.bottomNavItem}
           onPress={() => navigation.navigate("MyAds")}
         >
-          <FontAwesomeIcon icon={faShoppingBag} size={24} color={COLORS.primary} />
+          <FontAwesomeIcon
+            icon={faShoppingBag}
+            size={24}
+            color={COLORS.primary}
+          />
           <Text style={styles.bottomNavText}>İlanlarım</Text>
         </TouchableOpacity>
 
@@ -1577,7 +1593,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.bottomNavText}>Mesajlarım</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -1604,7 +1620,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
   } as ViewStyle,
   categoryItem: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: COLORS.surface,
     borderRadius: 16,
     padding: 16,
@@ -1620,8 +1636,8 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 16,
     backgroundColor: COLORS.background,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 8,
   },
   categoryName: {
@@ -1660,7 +1676,6 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   advertItem: {
-<<<<<<< HEAD
     flexDirection: 'row',
     backgroundColor: COLORS.surface,
     borderRadius: 20,
@@ -1680,18 +1695,18 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 16,
-    overflow: 'hidden',
+    overflow: "hidden",
     backgroundColor: COLORS.background,
   },
   imageActions: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
+    flexDirection: "row",
+    justifyContent: "space-evenly",
     padding: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
   },
   imageActionButton: {
     padding: 10,
@@ -1700,47 +1715,16 @@ const styles = StyleSheet.create({
   },
   favoriteButton: {
     backgroundColor: '#fff',
-=======
-    flexDirection: "row",
-    backgroundColor: "white",
-    borderRadius: 15,
-    marginBottom: 15,
-    padding: 15,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    overflow: "hidden", // Taşan içeriği gizle
-  },
-  advertImageContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 10,
-    overflow: "hidden",
-    backgroundColor: "#f0f0f0",
-  },
-  advertImage: {
-    width: "100%",
-    height: "100%",
-  },
-  defaultImageContainer: {
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f0f0f0",
->>>>>>> eeb74db6d406569624c36a98459ccf574b2973f9
   },
   advertInfo: {
     flex: 1,
     marginLeft: 16,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   advertHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 12,
   },
   titleContainer: {
@@ -1749,7 +1733,7 @@ const styles = StyleSheet.create({
   },
   advertTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.text.primary,
     letterSpacing: 0.5,
     marginBottom: 8,
@@ -1761,21 +1745,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   advertFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
     marginTop: 4,
   },
   sellerInfo: {
     flex: 1,
   },
   infoRow: {
-    flexDirection: 'column',
+    flexDirection: "column",
     gap: 8,
   },
   infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.background,
     paddingVertical: 6,
     paddingHorizontal: 10,
@@ -1786,7 +1770,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.text.secondary,
     marginLeft: 8,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   footer: {
     position: "absolute",
@@ -1816,14 +1800,15 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
     transform: [{ translateY: -20 }],
+    marginBottom: 30,
   },
   addButtonText: {
     fontSize: 10,
@@ -1839,13 +1824,14 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.border,
   },
   searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.background,
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginBottom: 12,
+    marginTop: 30,
   },
   searchInput: {
     flex: 1,
@@ -1855,7 +1841,7 @@ const styles = StyleSheet.create({
   },
   searchIcon: {
     fontSize: 16,
-    color: '#666',
+    color: "#666",
   },
   actionButtonsContainer: {
     flexDirection: "row",
@@ -1867,23 +1853,23 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     fontSize: 12,
-    color: '#333',
+    color: "#333",
     marginTop: 4,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f0faf9',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f0faf9",
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
     gap: 6,
   },
   filterButtonText: {
-    color: '#4B5563',
+    color: "#4B5563",
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
 
   // Modal Stilleri
@@ -2115,24 +2101,33 @@ const styles = StyleSheet.create({
   },
 
   bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
     paddingVertical: 16,
     paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    shadowColor: COLORS.shadow,
-    shadowOffset: { width: 0, height: -4 },
+    borderTopWidth: 0,
+    height: 70,
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
     shadowOpacity: 0.1,
-    shadowRadius: 12,
+    shadowRadius: 3.84,
     elevation: 5,
   },
   bottomNavItem: {
     alignItems: "center",
     justifyContent: "center",
-  },
+    padding: 8,
+    minWidth: 65,
+  } as ViewStyle,
   bottomNavText: {
     fontSize: 12,
     color: "#666",
@@ -2200,20 +2195,20 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   advertImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   defaultImageContainer: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F3F4F6",
   },
   actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f0faf9',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f0faf9",
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -2221,13 +2216,13 @@ const styles = StyleSheet.create({
   },
   advertPrice: {
     fontSize: 16,
-    color: '#FFFFFF',
-    fontWeight: '700',
+    color: "#FFFFFF",
+    fontWeight: "700",
     paddingHorizontal: 12,
     paddingVertical: 6,
     backgroundColor: COLORS.primary,
     borderRadius: 10,
-    overflow: 'hidden',
+    overflow: "hidden",
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,

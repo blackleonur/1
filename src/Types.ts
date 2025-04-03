@@ -8,12 +8,13 @@ export type RootStackParamList = {
   Profile: undefined;
   MessagesArea: undefined;
   Messages: { chatId: string };
-  AddAdvert: undefined;
+  AddAdvert: { adId?: number };
   PersonalInfo: undefined;
   Favs: undefined;
   MyAds: undefined;
   Privacy: undefined;
   Help: undefined;
+  EditAd: { adId: number };
   // ... diğer route'lar
 };
 
